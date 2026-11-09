@@ -119,3 +119,78 @@ describe('render', () => {
     expect(() => render(h(Comp, null))).toThrow(TypeError);
   });
 });
+
+// 리뷰 발견(#5). 기준: setProp / removeProp 뒤의 요소는 그 결과 props 로 render 한 요소와
+// 속성·화면 상태(.value / .checked / .selectedIndex)·이벤트 동작이 같다.
+// on* 이름은 대소문자를 무시하고 같은 이벤트 자리 하나로 본다 (HTML 속성 이름과 같은 원칙).
+describe('render — 리뷰 발견: setProp / removeProp', () => {
+  it('TC-RND-012 removeProp("value") 는 요소의 기본 상태로 돌린다 (value="" 를 남기지 않는다)', () => {
+    const option = render(h('option', { value: 'x' }, 'X'));
+    removeProp(option, 'value');
+    expect(option.hasAttribute('value')).toBe(false);
+    expect(option.value).toBe('X');
+
+    const button = render(h('button', { value: 'v' }, 'b'));
+    removeProp(button, 'value');
+    expect(button.hasAttribute('value')).toBe(false);
+
+    const box = render(h('input', { type: 'checkbox', value: 'yes' }));
+    removeProp(box, 'value');
+    expect(box.hasAttribute('value')).toBe(false);
+    expect(box.value).toBe('on');
+
+    const li = render(h('li', { value: '3' }, 'a'));
+    removeProp(li, 'value');
+    expect(li.hasAttribute('value')).toBe(false);
+
+    const select = render(h('select', { value: 'b' }, h('option', { value: 'a' }, 'A'), h('option', { value: 'b' }, 'B')));
+    removeProp(select, 'value');
+    expect(select.hasAttribute('value')).toBe(false);
+    expect(select.value).toBe('a');
+    expect(select.selectedIndex).toBe(0);
+  });
+
+  it('TC-RND-013 대소문자만 다른 LIVE prop 이름도 프로퍼티까지 바꾼다 (Checked, Value)', () => {
+    const box = render(h('input', { type: 'checkbox' }));
+    box.checked = false; // 사용자가 건드린 상태
+    setProp(box, 'Checked', true);
+    expect(box.checked).toBe(true);
+    removeProp(box, 'Checked');
+    expect(box.checked).toBe(false);
+
+    const input = render(h('input', { value: 'a' }));
+    input.value = '사용자가 입력함';
+    setProp(input, 'Value', 'b');
+    expect(input.value).toBe('b');
+  });
+
+  it('TC-RND-014 onclick 문자열 속성을 함수로 바꾸면 속성이 사라지고 함수만 호출된다', () => {
+    const f = vi.fn();
+    const el = render(h('button', { onclick: 'void 0' }, 'go'));
+    expect(el.getAttribute('onclick')).toBe('void 0');
+    setProp(el, 'onclick', f);
+    expect(el.hasAttribute('onclick')).toBe(false);
+    el.click();
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+
+  it('TC-RND-015 onClick 과 onclick 은 같은 이벤트 자리다 (나중 것이 이기고, 어느 이름으로든 지운다)', () => {
+    const f = vi.fn();
+    const g = vi.fn();
+    const el = render(h('button'));
+    setProp(el, 'onClick', f);
+    setProp(el, 'onclick', g);
+    el.click();
+    expect(f).not.toHaveBeenCalled();
+    expect(g).toHaveBeenCalledTimes(1);
+
+    removeProp(el, 'ONCLICK');
+    el.click();
+    expect(g).toHaveBeenCalledTimes(1);
+
+    const same = vi.fn();
+    const el2 = render(h('button', { onClick: same, onclick: same }));
+    el2.click();
+    expect(same).toHaveBeenCalledTimes(1);
+  });
+});
