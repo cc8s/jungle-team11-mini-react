@@ -4,6 +4,9 @@
   --muted: #656d76;
   --border: #d0d7de;
   --accent: #0969da;
+  --surface: #f6f8fa;
+  --danger: #cf222e;
+  --mono: ui-monospace, 'Cascadia Code', Consolas, 'D2Coding', monospace;
 }
 
 * { box-sizing: border-box; }
@@ -11,6 +14,8 @@
 body {
   margin: 0;
   font-family: system-ui, -apple-system, 'Segoe UI', 'Noto Sans KR', sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
   background: var(--bg);
   color: var(--fg);
 }
@@ -23,4 +28,141 @@ header {
   border-bottom: 1px solid var(--border);
 }
 
+header h1 { margin: 0; font-size: 1.4rem; }
+
+nav { display: flex; gap: 8px; }
+
+button {
+  font: inherit;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+button[aria-pressed='true'] { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
 main { padding: 16px; }
+
+/* Phase 1 ---------------------------------------------------------------
+   왼쪽: 실제 영역 / 오른쪽: 테스트 영역(textarea + 미리보기)
+   가운데 줄: 뒤로 · History 위치 · 앞으로 · Patch
+   아래: MutationObserver 로그 */
+
+.phase1 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    'real source'
+    'toolbar toolbar'
+    'log log';
+  gap: 16px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.pane-real { grid-area: real; }
+.pane-source { grid-area: source; }
+.toolbar { grid-area: toolbar; }
+.pane-log { grid-area: log; }
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pane h2, .pane h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--muted);
+}
+
+.pane h2 small { font-weight: normal; font-size: 0.85rem; }
+
+.surface {
+  min-height: 120px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: auto;
+}
+
+.pane-real .surface { flex: 1; border: 2px solid var(--accent); }
+
+.preview { background: var(--surface); }
+
+.source {
+  width: 100%;
+  min-height: 260px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  resize: vertical;
+  tab-size: 2;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.position {
+  min-width: 5em;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 1.1rem;
+}
+
+button.primary {
+  margin-left: 24px;
+  padding: 8px 28px;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.log {
+  max-height: 240px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+}
+
+.log:empty::before {
+  content: 'Patch 를 누르면 실제 영역에서 일어난 DOM 변경이 여기에 기록됩니다.';
+  display: block;
+  padding: 8px 12px;
+  color: var(--muted);
+  font-family: system-ui, sans-serif;
+}
+
+.log-entry { padding: 6px 12px; border-bottom: 1px solid var(--border); }
+.log-entry:last-child { border-bottom: none; }
+.log-entry:first-child { background: #ddf4ff; }
+.log-entry strong { display: inline-block; min-width: 4.5em; }
+.log-entry[data-empty='true'] { color: var(--muted); }
+.log-error { color: var(--danger); }
+
+@media (max-width: 800px) {
+  .phase1 {
+    grid-template-columns: 1fr;
+    grid-template-areas: 'source' 'toolbar' 'real' 'log';
+  }
+}
