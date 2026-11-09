@@ -45,6 +45,8 @@ function apply(root, p) {
     if (p.type === 'REMOVE') parent.removeChild(target);
     else parent.replaceChild(render(p.node, childNs(parent)), target);
   }
+  // textarea 의 텍스트 자식이 생기거나 없어져도 기본값이 바뀌므로 화면 값을 맞춘다.
+  syncTextarea(parent);
   return root;
 }
 
