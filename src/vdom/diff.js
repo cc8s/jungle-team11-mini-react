@@ -13,11 +13,12 @@ import { isText } from './vnode.js';
 
 export function diff(oldVNode, newVNode) {
   const patches = [];
-  walk(oldVNode, newVNode, [], patches);
+  walk(oldVNode, newVNode, [], patches, false);
   return patches;
 }
 
-function walk(oldVNode, newVNode, path, patches) {
+// inSvg: 부모에게서 물려받은 네임스페이스가 SVG 인가. render(vnode, ns) 의 규칙과 같다.
+function walk(oldVNode, newVNode, path, patches, inSvg) {
   if (oldVNode == null && newVNode == null) return;
   if (oldVNode == null) {
     patches.push({ type: 'ADD', path, node: newVNode });
@@ -36,39 +37,48 @@ function walk(oldVNode, newVNode, path, patches) {
     return;
   }
 
-  const props = diffProps(oldVNode.props, newVNode.props);
+  const svg = inSvg || newVNode.type === 'svg';
+  const props = diffProps(slots(oldVNode.props, !svg), slots(newVNode.props, !svg));
   if (props) patches.push({ type: 'PROPS', path, ...props });
-  diffChildren(oldVNode.children, newVNode.children, path, patches);
+  diffChildren(oldVNode.children, newVNode.children, path, patches, svg && newVNode.type !== 'foreignObject');
 }
 
 // render.js setProp 과 같은 규칙: null / undefined / false 는 속성이 없는 것과 같다.
 const isEmpty = (value) => value == null || value === false;
 
-// 'constructor', '__proto__' 같은 이름도 평범한 prop 이다. 프로토타입에서 값을 읽지 않는다.
-const own = (props, name) => (Object.hasOwn(props, name) ? props[name] : undefined);
+// props 를 DOM 의 속성 자리별로 모은다: Map<자리, { name, value }>. HTML 요소는 속성 이름의
+// 대소문자를 무시하므로 title 과 Title 은 한 자리이고, render 처럼 나중 것이 이긴다.
+// SVG 속성은 대소문자를 구분한다(viewBox). 'constructor', '__proto__' 같은 이름도 평범한 prop 이다.
+function slots(props, foldCase) {
+  const out = new Map();
+  for (const [name, value] of Object.entries(props)) {
+    out.set(foldCase ? name.toLowerCase() : name, { name, value });
+  }
+  return out;
+}
 
-function diffProps(oldProps, newProps) {
+function diffProps(oldSlots, newSlots) {
   const set = {};
   const remove = [];
-  for (const [name, value] of Object.entries(newProps)) {
+  for (const [slot, { name, value }] of newSlots) {
     if (isEmpty(value)) continue;
-    const prev = own(oldProps, name);
+    const prev = oldSlots.get(slot)?.value;
     if (isEmpty(prev) || !Object.is(prev, value)) {
       // 대입하면 '__proto__' 가 프로토타입을 바꾸므로 자기 속성으로 정의한다.
       Object.defineProperty(set, name, { value, writable: true, enumerable: true, configurable: true });
     }
   }
-  for (const [name, value] of Object.entries(oldProps)) {
-    if (!isEmpty(value) && isEmpty(own(newProps, name))) remove.push(name);
+  for (const [slot, { name, value }] of oldSlots) {
+    if (!isEmpty(value) && isEmpty(newSlots.get(slot)?.value)) remove.push(name);
   }
   return Object.keys(set).length || remove.length ? { set, remove } : null;
 }
 
 // 겹치는 인덱스를 먼저 비교하고, 남는 새 자식은 오름차순 ADD, 남는 옛 자식은 내림차순
 // REMOVE. 뒤에서부터 지워야 앞쪽 인덱스가 밀리지 않는다.
-function diffChildren(oldChildren, newChildren, path, patches) {
+function diffChildren(oldChildren, newChildren, path, patches, inSvg) {
   const common = Math.min(oldChildren.length, newChildren.length);
-  for (let i = 0; i < common; i++) walk(oldChildren[i], newChildren[i], [...path, i], patches);
+  for (let i = 0; i < common; i++) walk(oldChildren[i], newChildren[i], [...path, i], patches, inSvg);
   for (let i = common; i < newChildren.length; i++) {
     patches.push({ type: 'ADD', path: [...path, i], node: newChildren[i] });
   }
