@@ -29,6 +29,7 @@
 //   - 왕복 성질: render(old) 에 patch(dom, diff(old, new)) 를 적용한 결과는 render(new) 와
 //     outerHTML·isEqualNode 뿐 아니라 화면 상태 프로퍼티(.value / .checked / .selectedIndex)와
 //     이벤트 핸들러 동작까지 같다. 사용자가 입력해 값이 "dirty" 해진 뒤에도 그렇다 (TC-PATCH-102~107).
+//     textarea 의 자식 텍스트가 ADD / REMOVE 로 생기거나 없어져도 .value 가 render(new) 와 같다 (TC-PATCH-110~112).
 //     on* 이름은 대소문자를 무시하고 같은 이벤트 자리 하나로 본다(HTML 속성 이름과 같은 원칙,
 //     TC-RND-015). 같은 props 에 대소문자만 다른 이름이 둘 있으면 나중 것이 이긴다(render 와 같다).
 //   - 적용 순서: **받은 순서 그대로** 앞에서부터 하나씩 적용한다(정렬·재배치하지 않는다).
@@ -666,5 +667,31 @@ describe('patch — 리뷰 발견: 잘못된 patch 형태는 TypeError', () => {
 
   it('TC-PATCH-109 (BVA) patch(null, []) 은 null', () => {
     expect(patch(null, [])).toBe(null);
+  });
+});
+
+// textarea 의 화면 값(.value)은 사용자가 입력하면 자식 텍스트(기본값)와 갈라진다. TEXT 뿐 아니라
+// 자식 텍스트가 생기거나(ADD) 없어지거나(REMOVE) 바뀌는(REPLACE) patch 뒤에도 .value 는 render(new) 와 같아야 한다.
+describe('patch — 리뷰 발견: 사용자가 입력한 textarea 의 자식 텍스트 추가·삭제', () => {
+  const typed = (d) => { d.value = '사용자 입력'; };
+
+  it('TC-PATCH-110 (BVA) 텍스트 1 → 0 (REMOVE): .value 는 빈 문자열', () => {
+    const out = tripCompare(h('textarea', null, 'a'), h('textarea', null), (d) => d.value, typed);
+    expect(out.value).toBe('');
+  });
+
+  it('TC-PATCH-111 (BVA) 텍스트 0 → 1 (ADD): .value 는 새 텍스트', () => {
+    const out = tripCompare(h('textarea', null), h('textarea', null, 'b'), (d) => d.value, typed);
+    expect(out.value).toBe('b');
+  });
+
+  it('TC-PATCH-112 (EG) 부모 아래 textarea 의 텍스트 삭제·추가 (path 가 깊은 경우)', () => {
+    const out = tripCompare(
+      h('div', null, h('textarea', null, 'a'), h('textarea', null)),
+      h('div', null, h('textarea', null), h('textarea', null, 'b')),
+      (d) => [d.childNodes[0].value, d.childNodes[1].value],
+      (d) => { d.childNodes[0].value = 'x'; d.childNodes[1].value = 'y'; },
+    );
+    expect([out.childNodes[0].value, out.childNodes[1].value]).toEqual(['', 'b']);
   });
 });
