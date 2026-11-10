@@ -695,3 +695,41 @@ describe('patch — 리뷰 발견: 사용자가 입력한 textarea 의 자식 �
     expect([out.childNodes[0].value, out.childNodes[1].value]).toEqual(['', 'b']);
   });
 });
+
+// 리뷰 발견(#8). 원칙: VNode 에 value 가 있는 요소의 화면 값은 마지막 VNode 의 value 다.
+// patch 결과는 render(new) 와 같아야 하고, 그 값은 value prop 이다 (render(new) 도 틀릴 수 있으므로 값도 직접 본다).
+describe('patch — 리뷰 발견(#8): 제어 textarea · select', () => {
+  it('TC-PATCH-113 (EG) value prop 이 있는 textarea 의 자식 TEXT 가 바뀌어도 .value 는 value prop', () => {
+    const out = tripCompare(h('textarea', { value: 'a' }, 'x'), h('textarea', { value: 'a' }, 'y'), (d) => d.value);
+    expect(out.value).toBe('a');
+
+    // value prop 도 같이 바뀌면 새 value prop
+    const both = tripCompare(h('textarea', { value: 'a' }, 'x'), h('textarea', { value: 'b' }, 'y'), (d) => d.value);
+    expect(both.value).toBe('b');
+
+    // 자식 텍스트가 생기거나 없어져도 같다
+    const added = tripCompare(h('textarea', { value: 'a' }), h('textarea', { value: 'a' }, 'y'), (d) => d.value);
+    expect(added.value).toBe('a');
+    const removed = tripCompare(h('textarea', { value: 'a' }, 'x'), h('textarea', { value: 'a' }), (d) => d.value);
+    expect(removed.value).toBe('a');
+  });
+
+  it('TC-PATCH-114 (EG) select 의 value 와 새 option 이 같은 patch 에 오면 새 option 이 선택된다', () => {
+    const opts = (...vs) => vs.map((v) => h('option', { value: v }, v.toUpperCase()));
+    const out = tripCompare(
+      h('select', { value: 'a' }, opts('a', 'b')),
+      h('select', { value: 'c' }, opts('a', 'b', 'c')),
+      (d) => [d.value, d.selectedIndex],
+    );
+    expect(out.value).toBe('c');
+    expect(out.selectedIndex).toBe(2);
+
+    // 고른 option 이 REPLACE 로 바뀌는 경우 (value 가 같은 이름의 새 option)
+    const replaced = tripCompare(
+      h('select', { value: 'b' }, h('option', { value: 'a' }, 'A'), h('option', { value: 'b' }, 'B')),
+      h('select', { value: 'b' }, h('option', { value: 'a' }, 'A'), h('optgroup', { label: 'g' }, h('option', { value: 'b' }, 'B'))),
+      (d) => [d.value, d.selectedIndex],
+    );
+    expect(replaced.value).toBe('b');
+  });
+});
