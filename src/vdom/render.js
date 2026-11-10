@@ -4,9 +4,14 @@ import { isText } from './vnode.js';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const HTML_NS = 'http://www.w3.org/1999/xhtml';
 
-// 요소마다 붙인 이벤트 핸들러: Map<'onclick', fn>. 교체·제거하려면 이전 함수를 알아야 한다.
-// on* 이름은 대소문자를 무시한다: onClick 과 onclick 은 같은 자리다.
+// 요소마다 붙인 이벤트 핸들러: Map<'onclick', { handler, listener }>. listener 는 실제로 붙인 함수로,
+// handler 를 부른 뒤 제어 요소의 화면 값을 되돌린다. on* 이름은 대소문자를 무시한다.
 const listeners = new WeakMap();
+
+// 제어 요소(VNode 에 value / checked 가 있는 input·select·textarea)의 마지막 VNode 값: { value?, checked? }.
+// 화면 값은 항상 이 값이다: 사용자 입력이 바꿔도 핸들러가 끝나면 되돌린다.
+const controlled = new WeakMap();
+const CONTROLLABLE = new Set(['input', 'select', 'textarea']);
 
 // 속성만 바꾸면 화면에 반영되지 않는 것들. 사용자가 입력한 뒤에는 value 속성이 아니라
 // value 프로퍼티가 화면 값을 정하므로 둘 다 맞춘다.
@@ -29,6 +34,8 @@ export function render(vnode, ns = null) {
 
   const childNs = vnode.type === 'foreignObject' ? null : elNs;
   for (const child of vnode.children) el.appendChild(render(child, childNs));
+  // select 는 option 이 생긴 뒤에야 값을 고를 수 있고, textarea 는 텍스트 자식보다 value prop 이 우선이다.
+  if (controlled.get(el)?.value !== undefined) syncValue(el);
   return el;
 }
 
@@ -38,17 +45,27 @@ export function setProp(el, name, value) {
     const map = listeners.get(el) ?? new Map();
     const slot = name.toLowerCase();
     const prev = map.get(slot);
-    if (prev === value) return;
-    if (prev) el.removeEventListener(eventType(name), prev);
+    if (prev) {
+      prev.handler = value;
+      return;
+    }
     // onclick="..." 문자열 속성이 남아 있으면 그 코드도 실행되므로 지운다.
     if (el.hasAttribute(name)) el.removeAttribute(name);
-    el.addEventListener(eventType(name), value);
-    map.set(slot, value);
+    const entry = { handler: value, listener: null };
+    entry.listener = (event) => runHandler(el, entry.handler, event);
+    el.addEventListener(eventType(name), entry.listener);
+    map.set(slot, entry);
     listeners.set(el, map);
     return;
   }
   if (value == null || value === false) {
-    removeProp(el, name);
+    if (value === false) {
+      // checked: false 는 "꺼진 상태로 제어" 다. value 의 false 는 비제어.
+      clearProp(el, name);
+      markControlled(el, name, false);
+    } else {
+      removeProp(el, name);
+    }
     return;
   }
   dropListener(el, name); // 함수였다가 문자열이 된 on* 정리
@@ -57,14 +74,70 @@ export function setProp(el, name, value) {
   el.setAttribute(name, attr);
   const live = liveProp(el, name);
   if (live) el[live] = live === 'value' ? attr : true;
+  markControlled(el, name, live === 'value' ? attr : true);
 }
 
 export function removeProp(el, name) {
+  clearProp(el, name);
+  unmarkControlled(el, name);
+}
+
+function clearProp(el, name) {
   if (dropListener(el, name)) return;
   el.removeAttribute(name);
   const live = liveProp(el, name);
   if (live === 'value') resetValue(el);
   else if (live) el[live] = false;
+}
+
+// 제어 select / textarea 의 화면 값을 value prop 으로 맞춘다. 비제어 textarea 는 텍스트 자식(기본값)으로.
+// patch 가 자식을 바꾼 뒤에도 부른다.
+export function syncValue(el) {
+  if (el.namespaceURI !== HTML_NS) return;
+  const value = controlled.get(el)?.value;
+  if (el.localName === 'textarea') el.value = value ?? el.defaultValue;
+  else if (el.localName === 'select' && value !== undefined) el.value = value;
+}
+
+function markControlled(el, name, value) {
+  const live = liveProp(el, name);
+  if ((live !== 'value' && live !== 'checked') || !CONTROLLABLE.has(el.localName)) return;
+  const record = controlled.get(el) ?? {};
+  record[live] = live === 'checked' ? value !== false : value;
+  controlled.set(el, record);
+}
+
+// diff 는 checked: false 와 checked 가 없는 것을 구분하지 않고 remove 로 보낸다. 그래서 제어되던
+// checked 를 지우면 "꺼진 상태로 제어" 로 남긴다. value 를 지우면 비제어로 돌아간다.
+function unmarkControlled(el, name) {
+  const live = liveProp(el, name);
+  const record = controlled.get(el);
+  if (record == null) return;
+  if (live === 'checked' && record.checked !== undefined) record.checked = false;
+  else if (live === 'value') delete record.value;
+}
+
+// 핸들러가 끝나면 이 이벤트가 지나온 제어 요소(target ~ 핸들러를 붙인 요소)를 마지막 VNode 값으로 되돌린다.
+// 체크박스 클릭을 preventDefault 하면 브라우저가 dispatch 가 끝난 뒤 checked 를 되돌리므로 다음 작업에서 한 번 더.
+function runHandler(el, handler, event) {
+  const path = typeof event?.composedPath === 'function' ? event.composedPath() : [];
+  const end = path.indexOf(el);
+  const targets = end === -1 ? [el] : path.slice(0, end + 1);
+  try {
+    return handler.call(el, event);
+  } finally {
+    restoreControlled(targets);
+    setTimeout(() => restoreControlled(targets), 0);
+  }
+}
+
+function restoreControlled(nodes) {
+  for (const node of nodes) {
+    const record = controlled.get(node);
+    if (record == null) continue;
+    if (record.value !== undefined && node.value !== record.value) node.value = record.value;
+    if (record.checked !== undefined && node.checked !== record.checked) node.checked = record.checked;
+  }
 }
 
 // 함수 값일 때만 이벤트로 본다. 사용자 HTML 의 onclick="..." 은 문자열이라 속성으로 남는다.
@@ -83,7 +156,7 @@ function dropListener(el, name) {
   const slot = name.toLowerCase();
   const prev = map?.get(slot);
   if (!prev) return false;
-  el.removeEventListener(eventType(name), prev);
+  el.removeEventListener(eventType(name), prev.listener);
   map.delete(slot);
   return true;
 }
