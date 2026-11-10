@@ -16,8 +16,13 @@ const MAX_RERENDERS = 25;
 // 지금 루트 fn 을 실행 중인 컴포넌트. 그 밖에서는 null.
 let current = null;
 
+// hook 슬롯의 init 을 실행 중인 컴포넌트. 그 안에서 같은 컴포넌트의 hook 을 부르면 슬롯 순서가 뒤섞인다.
+// init 안에서 다른 컴포넌트를 mount 하는 것은 그 컴포넌트의 슬롯을 쓰므로 괜찮다.
+let initializing = null;
+
 // 공개 필드가 아닌 컴포넌트 내부 상태.
-//   rendering: 루트 fn 또는 expand 실행 중   pending: 렌더 중 update() 가 불렸다
+//   rendering: 루트 fn 또는 expand 실행 중   committing: 새 트리를 DOM 에 반영하는 중
+//   pending: 렌더·commit 중 update() 가 불렸다
 //   hookCount: 첫 commit 에서 확정된 hook 수 (그 전에는 null)
 const internals = new WeakMap();
 
@@ -29,6 +34,7 @@ export function getCurrentComponent() {
 // init 이 던지면 슬롯도 hookIndex 도 그대로 둔다: 그 호출은 hook 호출로 세지 않는다.
 export function useHookSlot(init) {
   const comp = current;
+  if (comp != null && comp === initializing) throw new Error('hook 의 init 안에서는 hook 을 부를 수 없습니다');
   if (comp == null) {
     throw new Error('hook 은 루트 컴포넌트 함수가 렌더되는 동안에만 부를 수 있습니다');
   }
@@ -37,7 +43,17 @@ export function useHookSlot(init) {
   if (hookCount != null && i >= hookCount) {
     throw new Error(`hook 을 첫 렌더(${hookCount}개)보다 많이 불렀습니다. hook 은 조건 없이 같은 순서로 불러야 합니다`);
   }
-  if (i >= comp.hooks.length) comp.hooks.push(init());
+  if (i >= comp.hooks.length) {
+    let value;
+    const outer = initializing;
+    initializing = comp;
+    try {
+      value = init();
+    } finally {
+      initializing = outer;
+    }
+    comp.hooks.push(value);
+  }
   comp.hookIndex = i + 1;
   return comp.hooks[i];
 }
@@ -54,11 +70,11 @@ export class FunctionComponent {
     this.vnode = null;
     this.dom = null;
     this.container = null;
-    internals.set(this, { rendering: false, pending: false, hookCount: null });
+    internals.set(this, { rendering: false, committing: false, pending: false, hookCount: null });
   }
 
   // 펼친 트리를 render 해 container 의 기존 자식 뒤에 붙인다. 첫 commit 전에 실패하면
-  // container 도 컴포넌트도 처음 상태로 남는다. 첫 렌더 중 update() 가 불렸으면 이어서 다시 렌더한다.
+  // container 도 컴포넌트도 처음 상태로 남는다. 첫 렌더·commit 중 update() 가 불렸으면 이어서 다시 렌더한다.
   mount(container) {
     if (!(container instanceof Node)) throw new TypeError('mount: container 는 DOM Node 여야 합니다');
     if (this.container != null) throw new Error('mount: 이미 mount 된 컴포넌트입니다');
@@ -68,14 +84,20 @@ export class FunctionComponent {
     let vnode;
     try {
       vnode = renderTree(this);
+      state.committing = true;
       if (vnode != null) dom = render(vnode, containerNs(container));
     } catch (e) {
+      state.committing = false;
       state.pending = false;
       this.hooks = [];
       this.hookIndex = 0;
       throw e;
     }
-    if (dom != null) container.appendChild(dom);
+    try {
+      if (dom != null) container.appendChild(dom);
+    } finally {
+      state.committing = false;
+    }
     this.container = container;
     this.vnode = vnode;
     this.dom = dom;
@@ -86,10 +108,10 @@ export class FunctionComponent {
   }
 
   // 다시 렌더해 이전 트리와 diff 하고, 이번 호출이 적용한 patch 전부를 돌려준다.
-  // 렌더 중에 불리면 표시만 하고 [] 를 돌려준다: 지금 렌더가 commit 된 뒤 다시 렌더한다.
+  // 렌더·commit 중에 불리면 표시만 하고 [] 를 돌려준다: 지금 렌더가 commit 된 뒤 다시 렌더한다.
   update() {
     const state = internals.get(this);
-    if (state.rendering) {
+    if (state.rendering || state.committing) {
       state.pending = true;
       return [];
     }
@@ -117,12 +139,17 @@ function rerender(comp, applied) {
 }
 
 // 새 트리를 DOM 에 반영하고 적용한 patch 목록을 돌려준다. 실패하면 표시된 재렌더도 버린다.
+// commit 도중(patch 의 setAttribute 가 부른 custom element 콜백 등) update() 도 렌더 중처럼 표시만 한다.
 function commit(comp, vnode) {
+  const state = internals.get(comp);
+  state.committing = true;
   try {
     return applyTree(comp, vnode);
   } catch (e) {
-    internals.get(comp).pending = false;
+    state.pending = false;
     throw e;
+  } finally {
+    state.committing = false;
   }
 }
 

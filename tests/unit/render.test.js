@@ -194,3 +194,23 @@ describe('render — 리뷰 발견: setProp / removeProp', () => {
     expect(same).toHaveBeenCalledTimes(1);
   });
 });
+
+// 리뷰 발견(#8). 원칙: VNode 에 value 가 있는 요소의 화면 값은 그 value 다. select 의 value 는
+// option 이 있어야 고를 수 있으므로, 자식을 만든 뒤에 적용된 것과 같은 결과여야 한다.
+describe('render — 리뷰 발견(#8): 제어 select', () => {
+  it('TC-RND-016 render(select{value:"b"}, a, b) → .value "b", selectedIndex 1 (option 보다 value 가 먼저 와도)', () => {
+    const select = render(h('select', { value: 'b' }, h('option', { value: 'a' }, 'A'), h('option', { value: 'b' }, 'B')));
+    expect(select.value).toBe('b');
+    expect(select.selectedIndex).toBe(1);
+
+    // 문서에 붙인 뒤에도 같다
+    document.body.appendChild(select);
+    expect(select.value).toBe('b');
+    select.remove();
+
+    // 마지막 option 을 고르는 경우와 텍스트만 있는 option
+    const last = render(h('select', { value: 'z' }, h('option', null, 'x'), h('option', null, 'y'), h('option', null, 'z')));
+    expect(last.value).toBe('z');
+    expect(last.selectedIndex).toBe(2);
+  });
+});

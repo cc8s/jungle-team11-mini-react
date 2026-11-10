@@ -695,3 +695,71 @@ describe('patch — 리뷰 발견: 사용자가 입력한 textarea 의 자식 �
     expect([out.childNodes[0].value, out.childNodes[1].value]).toEqual(['', 'b']);
   });
 });
+
+// 리뷰 발견(#8). 원칙: VNode 에 value 가 있는 요소의 화면 값은 마지막 VNode 의 value 다.
+// patch 결과는 render(new) 와 같아야 하고, 그 값은 value prop 이다 (render(new) 도 틀릴 수 있으므로 값도 직접 본다).
+describe('patch — 리뷰 발견(#8): 제어 textarea · select', () => {
+  it('TC-PATCH-113 (EG) value prop 이 있는 textarea 의 자식 TEXT 가 바뀌어도 .value 는 value prop', () => {
+    const out = tripCompare(h('textarea', { value: 'a' }, 'x'), h('textarea', { value: 'a' }, 'y'), (d) => d.value);
+    expect(out.value).toBe('a');
+
+    // value prop 도 같이 바뀌면 새 value prop
+    const both = tripCompare(h('textarea', { value: 'a' }, 'x'), h('textarea', { value: 'b' }, 'y'), (d) => d.value);
+    expect(both.value).toBe('b');
+
+    // 자식 텍스트가 생기거나 없어져도 같다
+    const added = tripCompare(h('textarea', { value: 'a' }), h('textarea', { value: 'a' }, 'y'), (d) => d.value);
+    expect(added.value).toBe('a');
+    const removed = tripCompare(h('textarea', { value: 'a' }, 'x'), h('textarea', { value: 'a' }), (d) => d.value);
+    expect(removed.value).toBe('a');
+  });
+
+  it('TC-PATCH-114 (EG) select 의 value 와 새 option 이 같은 patch 에 오면 새 option 이 선택된다', () => {
+    const opts = (...vs) => vs.map((v) => h('option', { value: v }, v.toUpperCase()));
+    const out = tripCompare(
+      h('select', { value: 'a' }, opts('a', 'b')),
+      h('select', { value: 'c' }, opts('a', 'b', 'c')),
+      (d) => [d.value, d.selectedIndex],
+    );
+    expect(out.value).toBe('c');
+    expect(out.selectedIndex).toBe(2);
+
+    // 고른 option 이 REPLACE 로 바뀌는 경우 (value 가 같은 이름의 새 option)
+    const replaced = tripCompare(
+      h('select', { value: 'b' }, h('option', { value: 'a' }, 'A'), h('option', { value: 'b' }, 'B')),
+      h('select', { value: 'b' }, h('option', { value: 'a' }, 'A'), h('optgroup', { label: 'g' }, h('option', { value: 'b' }, 'B'))),
+      (d) => [d.value, d.selectedIndex],
+    );
+    expect(replaced.value).toBe('b');
+  });
+});
+
+// 재리뷰(#8). option 의 props 와 select 의 value 가 같은 patch 에서 바뀌어도 결과는 render(new) 와 같고,
+// 선택은 select 의 value prop 이 정한다.
+describe('patch — 재리뷰(#8): option props 와 select value 가 같은 patch', () => {
+  it('TC-PATCH-115 (r4) option 의 value 와 select value 가 함께 바뀜: a,b(sel a) → x,y(sel y) → [y, 1]', () => {
+    const out = tripCompare(
+      h('select', { value: 'a' }, h('option', { value: 'a' }, 'Small'), h('option', { value: 'b' }, 'Large')),
+      h('select', { value: 'y' }, h('option', { value: 'x' }, 'Small'), h('option', { value: 'y' }, 'Large')),
+      (d) => [d.value, d.selectedIndex],
+    );
+    expect([out.value, out.selectedIndex]).toEqual(['y', 1]);
+
+    // 첫 option 의 value 만 고른 값으로 바뀜
+    const first = tripCompare(
+      h('select', { value: 'b' }, h('option', { value: 'a' }, 'A'), h('option', { value: 'b' }, 'B')),
+      h('select', { value: 'z' }, h('option', { value: 'z' }, 'A'), h('option', { value: 'b' }, 'B')),
+      (d) => [d.value, d.selectedIndex],
+    );
+    expect([first.value, first.selectedIndex]).toEqual(['z', 0]);
+  });
+
+  it('TC-PATCH-116 (r5) option 에 selected: true 가 생겨도 select value prop 이 이긴다 (render(new) 와 같음, "a")', () => {
+    const out = tripCompare(
+      h('select', { value: 'a' }, h('option', { value: 'a' }, 'A'), h('option', { value: 'b' }, 'B')),
+      h('select', { value: 'a' }, h('option', { value: 'a' }, 'A'), h('option', { value: 'b', selected: true }, 'B')),
+      (d) => [d.value, d.selectedIndex],
+    );
+    expect([out.value, out.selectedIndex]).toEqual(['a', 0]);
+  });
+});

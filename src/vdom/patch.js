@@ -3,7 +3,7 @@
 // patch 는 받은 순서 그대로 하나씩 적용하고, path 는 그 시점의 DOM 에서 childNodes 를 따라
 // 내려간다. 바뀐 노드만 건드린다: TEXT 는 텍스트 노드의 data 만, PROPS 는 속성만 바꾸고
 // 노드를 교체하지 않는다. 루트가 바뀌면(REPLACE / REMOVE / ADD) 새 루트를 돌려준다.
-import { render, setProp, removeProp } from './render.js';
+import { render, setProp, removeProp, syncValue } from './render.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const HTML_NS = 'http://www.w3.org/1999/xhtml';
@@ -45,8 +45,8 @@ function apply(root, p) {
     if (p.type === 'REMOVE') parent.removeChild(target);
     else parent.replaceChild(render(p.node, childNs(parent)), target);
   }
-  // textarea 의 텍스트 자식이 생기거나 없어져도 기본값이 바뀌므로 화면 값을 맞춘다.
-  syncTextarea(parent);
+  // textarea 의 텍스트 자식, select 의 option 이 생기거나 없어지면 화면 값을 맞춘다.
+  syncValues(parent);
   return root;
 }
 
@@ -70,7 +70,7 @@ function applyInPlace(node, p) {
     if (typeof p.text !== 'string') throw new TypeError('patch: TEXT 의 text 는 문자열이어야 합니다');
     if (node.nodeType !== Node.TEXT_NODE) throw new TypeError('patch: TEXT 대상이 텍스트 노드가 아닙니다');
     node.data = p.text;
-    syncTextarea(node.parentNode);
+    syncValues(node.parentNode);
     return;
   }
   if (!Array.isArray(p.remove)) throw new TypeError('patch: PROPS 의 remove 는 배열이어야 합니다');
@@ -79,6 +79,8 @@ function applyInPlace(node, p) {
   // HTML 속성 이름은 대소문자를 무시하므로 remove 를 먼저 해야 방금 설정한 값을 지우지 않는다.
   for (const name of p.remove) removeProp(node, name);
   for (const [name, value] of Object.entries(p.set)) setProp(node, name, value);
+  // option 의 value / selected 가 바뀌면 선택이 달라진다. render 처럼 select 의 value prop 이 이긴다.
+  if (node.localName !== 'textarea') syncValues(node);
 }
 
 function resolve(root, path) {
@@ -98,10 +100,22 @@ function isPlainObject(v) {
   return proto === Object.prototype || proto === null;
 }
 
-// textarea 의 텍스트는 기본값일 뿐이라, 사용자가 입력한 뒤에는 바꿔도 화면 값이 그대로다.
-// render 결과와 같도록 화면 값을 새 기본값으로 맞춘다.
-function syncTextarea(parent) {
-  if (parent?.localName === 'textarea' && parent.namespaceURI === HTML_NS) parent.value = parent.defaultValue;
+// 자식이 바뀐 뒤 render 결과와 같도록 화면 값을 다시 맞춘다. textarea 의 텍스트는 기본값일 뿐이라
+// 사용자가 입력한 뒤에는 바꿔도 화면 값이 그대로이고, select 의 value 는 option 이 바뀌면 다시 골라야 한다.
+// option 은 select 아래 두 단계(optgroup 안)까지 있을 수 있다.
+function syncValues(parent) {
+  if (parent?.namespaceURI !== HTML_NS) return;
+  if (parent.localName === 'textarea') {
+    syncValue(parent);
+    return;
+  }
+  let node = parent;
+  for (let depth = 0; depth < 3 && node != null; depth += 1, node = node.parentNode) {
+    if (node.localName === 'select' && node.namespaceURI === HTML_NS) {
+      syncValue(node);
+      return;
+    }
+  }
 }
 
 // 새 자식이 물려받을 네임스페이스. render(vnode, ns) 의 규칙과 같다.
