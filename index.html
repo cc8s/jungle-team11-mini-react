@@ -37,7 +37,7 @@
       </aside>
 
       <main class="page_main">
-        <section id="phase1_page" class="page_view" data-page_name="phase1" aria-label="Phase 1">
+        <section id="phase1_page" class="page_view page_view_fill" data-page_name="phase1" aria-label="Phase 1">
           <div class="area_grid">
             <section class="content_card">
               <header class="card_header">
@@ -77,33 +77,8 @@
         </section>
 
         <section id="phase2_page" class="page_view" data-page_name="phase2" aria-label="Phase 2" hidden>
-          <div class="area_grid">
-            <section class="content_card">
-              <header class="card_header">
-                <h2 class="card_title">FunctionComponent 구성</h2>
-                <span class="card_hint">구현 예정</span>
-              </header>
-              <dl class="spec_list">
-                <div class="spec_row"><dt><code>hooks</code></dt><dd>상태 저장용 배열</dd></div>
-                <div class="spec_row"><dt><code>mount()</code></dt><dd>처음 렌더링</dd></div>
-                <div class="spec_row"><dt><code>update()</code></dt><dd>상태 변경 후 다시 렌더링 (diff → patch)</dd></div>
-              </dl>
-            </section>
-
-            <section class="content_card">
-              <header class="card_header">
-                <h2 class="card_title">완료 기준</h2>
-                <span class="card_hint">0 / 5</span>
-              </header>
-              <ul class="check_list">
-                <li>FunctionComponent가 hooks, mount(), update()를 제공한다</li>
-                <li>mount()로 첫 화면이 렌더링된다</li>
-                <li>루트 State가 바뀌면 update()로 화면이 자동 갱신된다</li>
-                <li>자식 컴포넌트에 Hook과 State 사용이 없다</li>
-                <li>자식 컴포넌트는 같은 props에 항상 같은 결과를 반환한다</li>
-              </ul>
-            </section>
-          </div>
+          <!-- FunctionComponent(song_board_root)가 이 안을 그린다. State가 바뀌면 diff → patch로 바뀐 부분만 고친다 -->
+          <div id="song_board" class="area_grid song_board"></div>
         </section>
       </main>
 
@@ -113,10 +88,15 @@
             <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2"/></svg>
             State History
           </h2>
-          <span id="history_count" class="history_count"></span>
+          <span class="history_header_side">
+            <span id="history_count" class="history_count"></span>
+            <button type="button" id="highlight_toggle_button" class="icon_button history_toggle" aria-pressed="true" aria-label="변경 하이라이트 끄기" title="변경 하이라이트 끄기" data-page_scope="phase2" hidden>
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 10s3-5.5 8-5.5S18 10 18 10s-3 5.5-8 5.5S2 10 2 10z"/><circle cx="10" cy="10" r="2.5"/></svg>
+            </button>
+          </span>
         </header>
         <ol id="history_list" class="history_list" data-page_scope="phase1"></ol>
-        <p class="history_empty" data-page_scope="phase2" hidden>Phase 2를 구현하면 State 변경 이력이 여기에 표시됩니다.</p>
+        <ol id="render_history_list" class="history_list" data-page_scope="phase2" hidden></ol>
       </aside>
     </div>
 
