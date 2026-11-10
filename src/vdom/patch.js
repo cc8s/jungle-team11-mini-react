@@ -79,6 +79,8 @@ function applyInPlace(node, p) {
   // HTML 속성 이름은 대소문자를 무시하므로 remove 를 먼저 해야 방금 설정한 값을 지우지 않는다.
   for (const name of p.remove) removeProp(node, name);
   for (const [name, value] of Object.entries(p.set)) setProp(node, name, value);
+  // option 의 value / selected 가 바뀌면 선택이 달라진다. render 처럼 select 의 value prop 이 이긴다.
+  if (node.localName !== 'textarea') syncValues(node);
 }
 
 function resolve(root, path) {
