@@ -20,9 +20,12 @@
 //   - 네임스페이스: render(vnode, ns) 의 ns 는 container 에서 정한다. container 가 SVG 요소이고
 //     foreignObject 가 아니면 SVG, 그 밖에는 HTML. 루트 REPLACE / ADD 도 같은 규칙 (TC-COMP-051).
 //   - container 가 Node 가 아니면 TypeError. 이미 mount 된 컴포넌트를 다시 mount 하면 Error.
-//   - mount 가 예외로 끝나면 container 는 그대로이고, 컴포넌트는 mount 되지 않은 상태로 남는다
-//     (update 는 Error, 고친 뒤 mount 를 다시 할 수 있다). **hooks 는 [] , hookIndex 는 0 으로
-//     되돌린다**: 다시 mount 하면 init 을 처음부터 다시 부른다 (TC-COMP-048).
+//   - mount 가 **첫 commit 이 끝나기 전에**(렌더, render, container.appendChild — container 가 Text 노드나
+//     document 라 HierarchyRequestError 인 경우 포함) 예외로 끝나면 container 는 그대로이고, 컴포넌트는 mount
+//     되지 않은 상태로 남는다 (update 는 Error, 고친 뒤 mount 를 다시 할 수 있다). **hooks 는 [] , hookIndex 는 0,
+//     hook 종류·재렌더 표시도 초기화**: 다시 mount 하면 init 을 처음부터 다시 부른다 (TC-COMP-048, TC-EFF-090).
+//     첫 commit 뒤의 예외(재렌더 예외, 25회 초과, effect 예외, effect 가 일으킨 재렌더의 예외)는 mount 가 던지지만
+//     컴포넌트는 **mount 된 상태로 남는다** (tests/unit/effects.test.js 맨 위 계약).
 //
 // ── comp.update() → Patch[] ───────────────────────────────────────────────────
 //   - fn 을 다시 실행 → expand → diff(comp.vnode, 새 트리) → patch(comp.dom, patches).
@@ -61,7 +64,8 @@
 //   - 사용자가 container 에서 루트 DOM 을 떼어 낸 뒤의 update 는 정하지 않는다.
 //   - 루트가 null → 노드로 돌아오면 container 맨 뒤에 붙는다 (형제가 있으면 순서가 바뀔 수 있다).
 //   - 다른 컴포넌트의 렌더 중에 이 컴포넌트를 update / mount 하는 경우는 정하지 않는다.
-//   - effect 실행 시점은 #9 에서 정한다.
+//   - effect 실행 시점·unmount 는 #9 계약(tests/unit/effects.test.js 맨 위 주석)을 따른다: mount / update 한 번이
+//     예외 없이 마지막 commit 까지 끝났을 때 돌아오기 직전에 한 번.
 //
 // ── expand(value) → VNode | null ──────────────────────────────────────────────
 //   함수 type 을 모두 실행해 일반 VNode 트리로 바꾼다. 입력을 바꾸지 않는다(얼린 입력 가능).
