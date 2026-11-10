@@ -29,6 +29,7 @@ let initializing = null;
 //   hookCount: 첫 commit 에서 확정된 hook 수 (그 전에는 null)
 //   kinds: 자리마다 hook 종류 ('state' / 'effect' / 'memo', useHookSlot 을 직접 쓰면 undefined)
 //   unmounted: unmount 를 시작했다. 이후 다시 mount 할 수 없다
+//   renders: update() 가 실제로 렌더를 시작한 횟수. batch 표시 뒤 이미 다시 렌더됐는지 확인하는 데 쓴다
 const internals = new WeakMap();
 
 export function getCurrentComponent() {
@@ -48,6 +49,17 @@ export function withoutHooks(fn) {
 
 export function isUnmounted(comp) {
   return internals.get(comp).unmounted;
+}
+
+// update() 가 렌더를 시작할 때마다 1 씩 는다. 렌더가 예외로 끝나도 센다.
+export function renderCount(comp) {
+  return internals.get(comp).renders;
+}
+
+// 렌더·commit·effect 단계 중이다. 이때의 update() 는 표시만 하고 같은 호출 안에서 다시 렌더한다.
+export function isBusy(comp) {
+  const state = internals.get(comp);
+  return state.rendering || state.committing || state.effecting;
 }
 
 // 현재 컴포넌트의 다음 hook 슬롯. 처음 쓰는 슬롯이면 init() 결과를 저장한다.
@@ -98,6 +110,7 @@ export class FunctionComponent {
       hookCount: null,
       kinds: [],
       unmounted: false,
+      renders: 0,
     });
   }
 
@@ -147,6 +160,7 @@ export class FunctionComponent {
     }
     if (this.container == null) throw new Error('update: mount 하기 전에는 update 할 수 없습니다');
 
+    state.renders += 1;
     const applied = commit(this, renderTree(this));
     return flushEffects(this, rerender(this, applied));
   }
