@@ -22,21 +22,27 @@
 //   - 함수가 아니면 그 값이 새 상태. 인자 없이 부르면 undefined.
 //   - Object.is(이전, 새) 면 아무것도 하지 않는다 (렌더 없음). NaN → NaN 은 같음, 0 → -0 은 다름,
 //     내용이 같아도 새 객체면 다름.
-//   - 다르면 슬롯에 새 상태를 저장하고 그 컴포넌트의 update() 를 부른다.
-//       렌더 밖(이벤트 핸들러 등): **동기로** 다시 렌더 → diff → patch. setState 가 돌아오면 DOM 에 반영돼
-//         있다. (#10 batching 에서 바뀌는 부분. 아래 "동기 반영" describe 에 모았다. 나머지 테스트는
-//         setState 뒤 flush() 를 기다리고 확인하므로 batching 이 들어와도 그대로 유효하다.)
+//   - 다르면 슬롯에 새 상태를 저장하고 그 컴포넌트를 다시 렌더한다. 언제 렌더하는지는 부른 자리에 따라 다르다.
+//       batch 밖(직접 addEventListener 한 리스너, setTimeout·Promise 콜백, 최상위 코드 등, 그 컴포넌트가 렌더·
+//         commit·effect 단계 중이 아닐 때): **동기로** update() → diff → patch. setState 가 돌아오면 DOM 에 반영돼
+//         있다. 아래 "동기 반영" describe 는 이 경우를 batch 밖에서 확인한다.
+//       batch 안(이 라이브러리가 붙인 on* 핸들러(runHandler)와 batch(fn) 안, #10): 표시만 하고 가장 바깥 batch 가
+//         끝날 때 컴포넌트마다 1번 렌더한다. 계약은 tests/unit/batching.test.js 맨 위 (TC-HOOK-022 가 이에 맞춰
+//         바뀌었다). 나머지 테스트는 setState 뒤 flush() 를 기다리고 확인하므로 어느 경우든 유효하다.
 //       렌더 중(같은 컴포넌트의 루트 fn·자식 함수): component 의 재진입 규칙 그대로. 지금 렌더가 commit 된
 //         뒤 동기로 다시 렌더하고, 그 사이 여러 setState 는 누적되어 재렌더 1번이다. 매 렌더 상태를 바꾸면
-//         25회 초과 Error. 렌더 중 같은 값으로 setState 하면 재렌더 없음.
+//         25회 초과 Error. 렌더 중 같은 값으로 setState 하면 재렌더 없음. **batch 안이어도 같다** (그 컴포넌트가
+//         렌더·commit·effect 단계 중이면 batch 표시가 아니라 그 update()/mount() 호출 안에서 다시 렌더한다).
 //   - 반환값은 항상 undefined (patch 목록을 돌려주지 않는다).
 //   - setState 의 정체성: 같은 슬롯이면 렌더가 바뀌어도 **같은 함수 객체**. 슬롯이 다르거나
 //     컴포넌트 인스턴스가 다르면 다른 함수.
 //   - 오래된 클로저: 이전 렌더에서 꺼낸 setState 도 자기 슬롯에 쓰고, 업데이터는 최신 상태를 받는다.
 //
 // ── 예외와 생명주기 ─────────────────────────────────────────────────────────────
-//   - update 가 예외로 끝나면(렌더가 던짐, hook 개수 Error, patch 예외, 25회 초과) setState 는 그 예외를
-//     그대로 던진다 (동기 반영인 동안). **상태는 되돌리지 않는다**: 슬롯에는 새 값이 남고 DOM·comp.vnode 는
+//   - update 가 예외로 끝나면(렌더가 던짐, hook 개수 Error, patch 예외, 25회 초과) 그 예외를 그대로 던진다.
+//     batch 밖(동기 렌더)이면 setState 가 던진다. batch 안이면 setState 는 표시만 하고 던지지 않으며, 그 표시를
+//     처리한 batch 가 던진다 (batching 계약의 "끝까지 하고 첫 예외"). 어느 경우든
+//     **상태는 되돌리지 않는다**: 슬롯에는 새 값이 남고 DOM·comp.vnode 는
 //     component 계약대로 이전 그대로다. 그래서 같은 값으로 다시 setState 하면 Object.is 로 아무것도 하지
 //     않고, 다음 update() 가 남은 값을 그린다.
 //   - 업데이터가 던지면 그 예외를 그대로 던지고 상태도 렌더도 바뀌지 않는다.
@@ -120,7 +126,8 @@ function allNodes(root) {
   return out;
 }
 
-// 예약된 갱신이 있으면 끝날 때까지 기다린다. 동기 반영인 지금은 아무것도 하지 않는 것과 같다.
+// 다음 작업까지 기다린다. batch 렌더는 batch 가 돌아올 때 끝나므로 렌더를 기다리는 용도는 아니고,
+// 다음 작업에서 하는 일(제어 요소 되돌리기 등)과 Promise 콜백을 끝내기 위해 쓴다.
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 afterEach(() => {
@@ -659,7 +666,7 @@ describe('mount 실패한 컴포넌트의 setState', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 동기 반영: #8 의 계약. #10 batching 이 들어오면 이 describe 를 그 계약으로 바꾼다.
+// 동기 반영: #8 의 계약. batch 밖 setState 는 #10 이후에도 동기다. 핸들러 안 여러 setState(TC-HOOK-022)만 #10 에서 바뀌었다.
 describe('동기 반영 (#10 batching 에서 바뀌는 부분)', () => {
   it('TC-HOOK-021 렌더 밖 setState 는 돌아오기 전에 DOM 에 반영된다 (await 없이), setState 1번 = 렌더 1번', () => {
     let setN;
@@ -683,7 +690,8 @@ describe('동기 반영 (#10 batching 에서 바뀌는 부분)', () => {
     expect(fn).toHaveBeenCalledTimes(2);
   });
 
-  it('TC-HOOK-022 한 핸들러의 업데이터 3번 → 동기 렌더 3번, 각 렌더 사이에 DOM 이 이미 바뀌어 있다', () => {
+  // #10 batching 으로 계약이 바뀐 케이스 (결정 0016, tests/unit/batching.test.js). 이전 계약: 렌더 3번, 텍스트 1·2·3.
+  it('TC-HOOK-022 (#10 변경) 한 핸들러의 업데이터 3번 → 핸들러가 끝날 때 렌더 1번, 핸들러 안에서는 DOM 이 아직 이전 값', () => {
     const texts = [];
     const fn = vi.fn(() => {
       const [n, setN] = useState(0);
@@ -709,8 +717,9 @@ describe('동기 반영 (#10 batching 에서 바뀌는 부분)', () => {
     fn.mockClear();
 
     button.click();
-    expect(fn).toHaveBeenCalledTimes(3);
-    expect(texts).toEqual(['1', '2', '3']);
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(texts).toEqual(['0', '0', '0']);
+    expect(button.textContent).toBe('3');
   });
 
   it('TC-HOOK-023 setState 뒤 렌더가 던지면 setState 가 같은 예외를 던지고 DOM·vnode 그대로, 상태는 되돌리지 않는다', () => {
