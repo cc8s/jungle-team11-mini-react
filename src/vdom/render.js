@@ -117,18 +117,41 @@ function unmarkControlled(el, name) {
   else if (live === 'value') delete record.value;
 }
 
-// 핸들러가 끝나면 이 이벤트가 지나온 제어 요소(target ~ 핸들러를 붙인 요소)를 마지막 VNode 값으로 되돌린다.
-// 체크박스 클릭을 preventDefault 하면 브라우저가 dispatch 가 끝난 뒤 checked 를 되돌리므로 다음 작업에서 한 번 더.
+// 값을 바꾸는 이벤트. 이 종류의 핸들러가 경로에 있으면 dispatch 가 끝난 뒤 제어 요소를 되돌린다.
+const RESTORE_EVENTS = new Set(['input', 'change', 'click']);
+const restoreScheduled = new WeakSet();
+
 function runHandler(el, handler, event) {
-  const path = typeof event?.composedPath === 'function' ? event.composedPath() : [];
-  const end = path.indexOf(el);
-  const targets = end === -1 ? [el] : path.slice(0, end + 1);
-  try {
-    return handler.call(el, event);
-  } finally {
-    restoreControlled(targets);
-    setTimeout(() => restoreControlled(targets), 0);
+  if (RESTORE_EVENTS.has(event?.type)) scheduleRestore(event, el);
+  return handler.call(el, event);
+}
+
+// 되돌리기는 다음 작업에서 한다. click 의 activation 은 dispatch 가 끝난 뒤에 input / change 를 내고
+// (그 핸들러는 토글된 값을 봐야 한다), preventDefault 된 체크박스는 dispatch 뒤에 checked 를 되돌리기 때문이다.
+// 경로는 dispatch 가 끝나면 비므로 대상은 지금 정한다.
+function scheduleRestore(event, el) {
+  if (restoreScheduled.has(event)) return;
+  restoreScheduled.add(event);
+  const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+  const nodes = path.length ? path : [el];
+  const targets = new Set();
+  for (const node of nodes) {
+    if (!controlled.has(node)) continue;
+    targets.add(node);
+    if (node.localName === 'input' && node.type === 'radio' && node.name) {
+      for (const radio of radioGroup(node)) if (controlled.has(radio)) targets.add(radio);
+    }
   }
+  if (targets.size) setTimeout(() => restoreControlled(targets), 0);
+}
+
+// 같은 name 의 radio: 같은 form, form 이 없으면 같은 문서(트리)에서 form 이 없는 것.
+function radioGroup(radio) {
+  const scope = radio.form ?? radio.getRootNode();
+  if (typeof scope.querySelectorAll !== 'function') return [];
+  return [...scope.querySelectorAll('input[type="radio"]')].filter(
+    (other) => other.name === radio.name && other.form === radio.form,
+  );
 }
 
 function restoreControlled(nodes) {
