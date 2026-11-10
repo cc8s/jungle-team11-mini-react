@@ -77,13 +77,26 @@ main { padding: 16px; }
   min-width: 0;
 }
 
-.pane h2, .pane h3 {
+/* 패널 제목만. `.pane h2` 로 쓰면 실제 영역·미리보기 안의 사용자 h2 까지 덮는다. */
+.pane > h2, .pane > h3 {
   margin: 0;
   font-size: 1rem;
   color: var(--muted);
 }
 
-.pane h2 small { font-weight: normal; font-size: 0.85rem; }
+.pane > h2 small { font-weight: normal; font-size: 0.85rem; }
+
+/* 사용자 콘텐츠(실제 영역·미리보기): 브라우저 기본 문서 모양에 가깝게. */
+.surface > :first-child { margin-top: 0; }
+.surface > :last-child { margin-bottom: 0; }
+.surface h1 { font-size: 1.8rem; margin: 0.6em 0 0.4em; }
+.surface h2 { font-size: 1.4rem; margin: 0.6em 0 0.4em; }
+.surface h3 { font-size: 1.15rem; margin: 0.6em 0 0.4em; }
+.surface .card > :first-child { margin-top: 0; }
+.surface li.done { color: var(--muted); text-decoration: line-through; }
+.surface table { border-collapse: collapse; }
+.surface th, .surface td { border: 1px solid var(--border); padding: 4px 8px; }
+.surface code { font-family: var(--mono); background: var(--surface); padding: 0 4px; border-radius: 4px; }
 
 .surface {
   min-height: 120px;
