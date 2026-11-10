@@ -30,6 +30,7 @@ let initializing = null;
 //   kinds: 자리마다 hook 종류 ('state' / 'effect' / 'memo', useHookSlot 을 직접 쓰면 undefined)
 //   unmounted: unmount 를 시작했다. 이후 다시 mount 할 수 없다
 //   renders: update() 가 실제로 렌더를 시작한 횟수. batch 표시 뒤 이미 다시 렌더됐는지 확인하는 데 쓴다
+//   onUpdate: 생성 옵션의 관찰 콜백 (없으면 null). 계약은 tests/unit/on-update.test.js 맨 위 주석
 const internals = new WeakMap();
 
 export function getCurrentComponent() {
@@ -91,9 +92,13 @@ export function useHookSlot(init, kind) {
 }
 
 export class FunctionComponent {
-  constructor(fn, props) {
+  constructor(fn, props, options) {
     if (typeof fn !== 'function') {
       throw new TypeError(`FunctionComponent: fn 은 함수여야 합니다 (받은 값: ${typeof fn})`);
+    }
+    const onUpdate = options?.onUpdate ?? null;
+    if (onUpdate !== null && typeof onUpdate !== 'function') {
+      throw new TypeError(`FunctionComponent: options.onUpdate 는 함수여야 합니다 (받은 값: ${typeof onUpdate})`);
     }
     this.fn = fn;
     this.props = props ?? {};
@@ -111,6 +116,7 @@ export class FunctionComponent {
       kinds: [],
       unmounted: false,
       renders: 0,
+      onUpdate,
     });
   }
 
@@ -151,6 +157,7 @@ export class FunctionComponent {
 
   // 다시 렌더해 이전 트리와 diff 하고, 이번 호출이 적용한 patch 전부를 돌려준다.
   // 렌더·commit·effect 단계 중에 불리면 표시만 하고 [] 를 돌려준다: 지금 단계가 끝난 뒤 다시 렌더한다.
+  // 예외 없이 끝나면 돌아오기 직전에 onUpdate 를 돌려줄 배열 그대로 한 번 부른다.
   update() {
     const state = internals.get(this);
     if (state.unmounted) throw new Error('update: unmount 된 컴포넌트는 update 할 수 없습니다');
@@ -161,8 +168,9 @@ export class FunctionComponent {
     if (this.container == null) throw new Error('update: mount 하기 전에는 update 할 수 없습니다');
 
     state.renders += 1;
-    const applied = commit(this, renderTree(this));
-    return flushEffects(this, rerender(this, applied));
+    const applied = flushEffects(this, rerender(this, commit(this, renderTree(this))));
+    state.onUpdate?.(applied);
+    return applied;
   }
 
   // 실행된 effect 의 cleanup 을 선언 순서로 부르고 루트 DOM 을 container 에서 뗀다.

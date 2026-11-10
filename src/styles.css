@@ -179,3 +179,114 @@ button.primary {
     grid-template-areas: 'source' 'toolbar' 'real' 'log';
   }
 }
+
+/* Phase 2 ---------------------------------------------------------------
+   왼쪽: 오목 판(App) / 오른쪽: 통계 패널(App 트리 밖)
+   판 스타일 참고: https://github.com/codingapple1/gibo
+   18×18 선 격자 위에 19×19 교차점 격자(칸 = button)를 반 칸 어긋나게 겹친다. */
+
+.phase2 {
+  --cell: 28px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 32px;
+}
+
+.gomoku {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 8px;
+  background: #fff0db;
+}
+
+.gomoku-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.gomoku-bar p { margin: 0; }
+.gomoku-status { font-size: 1.2rem; font-weight: 600; min-width: 5em; }
+.gomoku-stones { color: var(--muted); font-family: var(--mono); }
+.gomoku-bar button { margin-left: auto; }
+
+.goban {
+  position: relative;
+  width: calc(var(--cell) * 20);
+  height: calc(var(--cell) * 20);
+  padding: var(--cell);
+  background: rgb(255, 180, 76);
+}
+
+.goban-lines {
+  display: grid;
+  grid-template-columns: repeat(18, var(--cell));
+  grid-template-rows: repeat(18, var(--cell));
+}
+
+.goban-lines div { border: 1px solid black; }
+
+.goban-board {
+  position: absolute;
+  top: calc(var(--cell) / 2);
+  left: calc(var(--cell) / 2);
+  display: grid;
+  grid-template-columns: repeat(19, var(--cell));
+  grid-template-rows: repeat(19, var(--cell));
+}
+
+/* 칸은 button 이다: 기본 버튼 모양을 지운다. */
+.goban-board .cell {
+  width: var(--cell);
+  height: var(--cell);
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: calc(var(--cell) * 0.4);
+  line-height: 1;
+}
+
+.goban-board .cell:hover:not(.b):not(.w) { background: rgba(0, 0, 0, 0.15); }
+.goban-board .cell:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.goban-board .cell.b { background: black; color: white; }
+.goban-board .cell.w { background: white; color: black; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35); }
+
+/* 수순 번호. 자식 노드가 아니라 data-move 속성이라 한 수의 patch 는 칸 PROPS 하나뿐이다. */
+.goban-board .cell[data-move]::after { content: attr(data-move); }
+
+.stats {
+  min-width: 220px;
+  padding: 20px 24px;
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+}
+
+.stats h2 { margin: 0 0 12px; font-size: 1rem; color: var(--muted); }
+
+.stat {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.stat-value {
+  min-width: 2.5ch;
+  font-family: var(--mono);
+  font-size: 4rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--accent);
+  text-align: right;
+}
+
+.stat-label { font-size: 1.4rem; }
