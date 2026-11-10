@@ -8,7 +8,6 @@ import { parse_html_to_virtual_tree } from './parse_html.js';
 import {
   create_state_history,
   get_current_entry,
-  is_at_latest_entry,
   can_go_back,
   can_go_forward,
   go_back,
@@ -57,10 +56,9 @@ function record_entry_details(entry, summary_text) {
   entry_details_by_id.set(entry.entry_id, { summary_text, confirmed_at_ms: Date.now() });
 }
 
-// 기존 상태를 맨 앞으로 다시 확정하면 확정 시각만 갱신한다. 카드에는 별도 문구를 붙이지 않는다.
-function touch_entry_details(entry) {
-  const entry_details = entry_details_by_id.get(entry.entry_id);
-  if (entry_details) entry_details.confirmed_at_ms = Date.now();
+// 이력에서 버려진 상태의 카드 정보도 함께 지운다.
+function forget_entry_details(entries) {
+  for (const entry of entries) entry_details_by_id.delete(entry.entry_id);
 }
 
 function render_test_area(virtual_tree) {
@@ -132,8 +130,8 @@ function render_page_meta() {
 function update_controls() {
   back_button.disabled = !can_go_back(state_history);
   forward_button.disabled = !can_go_forward(state_history);
-  // 이전 상태를 보고 있으면 수정이 없어도 Patch로 그 상태를 맨 앞으로 올릴 수 있다.
-  patch_button.disabled = !is_test_area_dirty && is_at_latest_entry(state_history);
+  // 테스트 영역을 고쳤을 때만 Patch할 수 있다. 수정 없는 Patch는 이력을 바꾸지 않는다.
+  patch_button.disabled = !is_test_area_dirty;
   render_history_list();
   render_page_meta();
 }
@@ -175,9 +173,9 @@ function handle_patch() {
   state_history = commit_result.history;
   render_test_area(commit_result.tree);
 
-  if (commit_result.outcome === commit_outcomes.promoted || commit_result.outcome === commit_outcomes.deduplicated) {
-    touch_entry_details(commit_result.entry);
-  } else if (commit_result.outcome === commit_outcomes.appended) {
+  if (commit_result.outcome === commit_outcomes.appended) {
+    // 뒤로 간 상태에서 고쳤다면 뒤쪽 상태는 버려지고 새 상태가 바로 뒤에 붙는다(브라우저 방식).
+    forget_entry_details(commit_result.discarded_entries);
     record_entry_details(commit_result.entry, format_operation_summary(summarize_operations(operations)));
   }
   update_controls();

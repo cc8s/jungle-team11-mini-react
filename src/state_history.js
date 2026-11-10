@@ -1,14 +1,13 @@
-// State History: "확정(Patch)한 순서"로 쌓이는 Virtual DOM 트리 목록.
+// State History: 브라우저 뒤로가기·앞으로가기와 같은 한 줄짜리 Virtual DOM 트리 목록.
 // 각 항목은 루트부터 완전한 트리이고, 안 바뀐 노드는 이전 트리와 같은 객체를 공유한다.
+// 뒤로 간 상태에서 수정해 Patch하면 그 뒤쪽 상태들은 버리고 새 상태를 붙인다(갈래 버리기).
 // 모든 함수는 기존 이력을 수정하지 않고 새 이력 객체를 돌려준다.
 
 export const default_maximum_entry_count = 50;
 
 export const commit_outcomes = Object.freeze({
-  unchanged: 'unchanged', // 맨 앞에서 변경 없음 → 저장하지 않음
-  promoted: 'promoted', // 이전 상태에서 변경 없음 → 그 상태를 맨 앞으로 올림
-  deduplicated: 'deduplicated', // 이력에 이미 있는 내용 → 그 항목을 맨 앞으로 올림
-  appended: 'appended', // 새 상태 추가
+  unchanged: 'unchanged', // 지금 보고 있는 상태와 같음 → 아무것도 바꾸지 않음
+  appended: 'appended', // 새 상태 추가 (현재 위치 뒤쪽 상태는 버림)
 });
 
 function freeze_history(entries, current_index, next_entry_id, maximum_entry_count) {
@@ -44,7 +43,7 @@ export function can_go_forward(state_history) {
   return !is_at_latest_entry(state_history);
 }
 
-// 이동은 이력 순서를 바꾸지 않고 현재 위치만 바꾼다. 범위 밖이면 같은 객체를 그대로 돌려준다.
+// 이동은 이력을 바꾸지 않고 현재 위치만 바꾼다. 범위 밖이면 같은 객체를 그대로 돌려준다.
 export function go_to_index(state_history, target_index) {
   if (!Number.isInteger(target_index)) return state_history;
   if (target_index < 0 || target_index >= state_history.entries.length) return state_history;
@@ -65,58 +64,40 @@ export function go_forward(state_history) {
   return go_to_index(state_history, state_history.current_index + 1);
 }
 
-function move_entry_to_latest(state_history, entry_index) {
-  const reordered_entries = state_history.entries.filter((entry, index) => index !== entry_index);
-  reordered_entries.push(state_history.entries[entry_index]);
-  return freeze_history(
-    reordered_entries,
-    reordered_entries.length - 1,
-    state_history.next_entry_id,
-    state_history.maximum_entry_count,
-  );
-}
-
 // Patch 확정. 비교 기준은 "지금 보고 있는 상태"다.
-// 돌려주는 tree가 실제 영역에 그려야 할 정식 트리다(중복 제거 시 기존 항목의 트리).
+// - 같으면 아무것도 바꾸지 않는다. 뒤로 간 상태여도 뒤쪽 상태를 버리지 않는다.
+// - 다르면 현재 위치 뒤쪽 상태를 모두 버리고 새 상태를 붙인다. 버린 항목은 discarded_entries로 알려 준다.
 export function commit_tree(state_history, new_tree, are_trees_equal) {
   if (new_tree === null || new_tree === undefined) throw new TypeError('저장할 트리가 필요합니다');
   if (typeof are_trees_equal !== 'function') throw new TypeError('are_trees_equal 함수가 필요합니다');
 
   const current_entry = get_current_entry(state_history);
   if (are_trees_equal(current_entry.tree, new_tree)) {
-    if (is_at_latest_entry(state_history)) {
-      return { history: state_history, outcome: commit_outcomes.unchanged, entry: current_entry, tree: current_entry.tree };
-    }
-    const promoted_history = move_entry_to_latest(state_history, state_history.current_index);
-    return { history: promoted_history, outcome: commit_outcomes.promoted, entry: current_entry, tree: current_entry.tree };
-  }
-
-  const duplicate_index = state_history.entries.findIndex(
-    (entry, index) => index !== state_history.current_index && are_trees_equal(entry.tree, new_tree),
-  );
-  if (duplicate_index !== -1) {
-    const duplicate_entry = state_history.entries[duplicate_index];
     return {
-      history: move_entry_to_latest(state_history, duplicate_index),
-      outcome: commit_outcomes.deduplicated,
-      entry: duplicate_entry,
-      tree: duplicate_entry.tree,
+      history: state_history,
+      outcome: commit_outcomes.unchanged,
+      entry: current_entry,
+      tree: current_entry.tree,
+      discarded_entries: [],
     };
   }
 
+  const kept_entries = state_history.entries.slice(0, state_history.current_index + 1);
+  const discarded_entries = state_history.entries.slice(state_history.current_index + 1);
   const appended_entry = Object.freeze({ entry_id: state_history.next_entry_id, tree: new_tree });
-  const appended_entries = [...state_history.entries, appended_entry];
+  const next_entries = [...kept_entries, appended_entry];
   // 최대 개수를 넘으면 가장 오래된 항목부터 버린다. 초기 상태도 예외 없이 버린다.
-  while (appended_entries.length > state_history.maximum_entry_count) appended_entries.shift();
+  while (next_entries.length > state_history.maximum_entry_count) discarded_entries.push(next_entries.shift());
   return {
     history: freeze_history(
-      appended_entries,
-      appended_entries.length - 1,
+      next_entries,
+      next_entries.length - 1,
       state_history.next_entry_id + 1,
       state_history.maximum_entry_count,
     ),
     outcome: commit_outcomes.appended,
     entry: appended_entry,
     tree: new_tree,
+    discarded_entries,
   };
 }
