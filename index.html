@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Virtual DOM 검증기</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header class="page_header">
+      <div>
+        <h1>Virtual DOM · Diff · Patch 검증기</h1>
+        <p class="page_description">테스트 영역의 HTML을 고치고 Patch를 누르면 바뀐 부분만 실제 영역에 반영됩니다. <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Enter</kbd>로도 Patch할 수 있습니다.</p>
+      </div>
+      <nav class="control_bar" aria-label="이력 이동과 Patch">
+        <button type="button" id="back_button">← 뒤로가기</button>
+        <button type="button" id="forward_button">앞으로가기 →</button>
+        <button type="button" id="patch_button" class="primary_button">Patch</button>
+      </nav>
+    </header>
+
+    <section class="history_bar" aria-label="State History">
+      <span class="history_label">State History</span>
+      <ol id="history_list" class="history_list"></ol>
+    </section>
+
+    <p id="feedback_message" class="feedback_message" role="status" aria-live="polite"></p>
+
+    <main class="area_grid">
+      <section class="area_panel">
+        <h2 class="area_title">실제 영역 <span class="area_hint">diff 결과만 patch</span></h2>
+        <!-- 실제 영역의 내용이 테스트 영역에 그대로 보이므로 들여쓰기를 0부터 시작한다 -->
+        <div id="real_area" class="real_area"><section id="profile_card">
+  <h2>오늘의 할 일</h2>
+  <p class="card_description">이 문단의 글자를 바꾸면 TEXT 연산 하나만 생깁니다.</p>
+  <ul id="todo_list">
+    <li id="todo_shopping">장보기</li>
+    <li id="todo_exercise">운동하기</li>
+    <li id="todo_reading">책 읽기</li>
+  </ul>
+  <!-- id가 있는 li는 key로 비교하므로 순서를 바꾸면 MOVE가 됩니다 -->
+  <label>메모 <input id="memo_input" placeholder="여기 입력한 값이 patch 후에도 남는지 확인"></label>
+  <p>id 없는 문단은 위치로 비교합니다.</p>
+</section></div>
+      </section>
+
+      <section class="area_panel">
+        <h2 class="area_title"><label for="test_area">테스트 영역</label> <span class="area_hint">HTML을 자유롭게 수정</span></h2>
+        <textarea id="test_area" class="test_area" spellcheck="false" autocomplete="off"></textarea>
+      </section>
+    </main>
+
+    <section class="detail_grid">
+      <details class="detail_panel" open>
+        <summary>마지막 patch 연산</summary>
+        <ol id="operation_log" class="operation_log"></ol>
+      </details>
+      <details class="detail_panel">
+        <summary>현재 Virtual DOM</summary>
+        <pre id="virtual_tree_view" class="virtual_tree_view"></pre>
+      </details>
+    </section>
+
+    <script type="module" src="src/app.js"></script>
+  </body>
+</html>
