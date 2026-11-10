@@ -20,8 +20,13 @@ function list_tree(item_keys, text_prefix = '') {
   ]);
 }
 
+// 화면에 보이는지와 상관없이 diff가 만든 연산 종류만 센다(BIND 제외).
 function counts_of(operations) {
-  return { ...summarize_operations(operations).counts_by_kind };
+  const counts_by_kind = {};
+  for (const operation of operations) {
+    if (operation.kind !== operation_kinds.bind) counts_by_kind[operation.kind] = (counts_by_kind[operation.kind] ?? 0) + 1;
+  }
+  return counts_by_kind;
 }
 
 test('EC-001 diff_trees에 Virtual DOM 노드가 아닌 값을 넣으면 TypeError', () => {
@@ -195,4 +200,13 @@ test('EC-017 1000개 항목을 뒤집으면 MOVE 999개', () => {
 test('EC-018 빈 children에서 추가하고 전부 지우는 경우', () => {
   assert.deepEqual(counts_of(diff_trees(fragment_node(), list_tree(['a']))), { ADD: 1 });
   assert.deepEqual(counts_of(diff_trees(list_tree(['a']), fragment_node())), { REMOVE: 1 });
+});
+
+test('EC-021 TEXT 연산은 이전 트리의 부모 노드를 함께 담는다', () => {
+  const old_tree = fragment_node([element_node('pre', null, [text_node('a')])]);
+  const new_tree = fragment_node([element_node('pre', null, [text_node('b')])]);
+  const text_operation = diff_trees(old_tree, new_tree).find((operation) => operation.kind === operation_kinds.text);
+  assert.equal(text_operation.parent_node, old_tree.children[0]);
+  const root_text_operation = diff_trees(text_node('a'), text_node('b')).find((operation) => operation.kind === operation_kinds.text);
+  assert.equal(root_text_operation.parent_node, null);
 });

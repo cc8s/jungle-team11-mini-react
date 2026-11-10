@@ -30,6 +30,7 @@
 | EC-012 | attribute, 주석, 교체가 섞임 | 결과 DOM이 새 트리와 같음 | EC-012 attribute와 주석 변경, 교체가 섞인 patch 결과가 새 트리와 같다 | 통과 |
 | EC-013 | 무작위 트리 500쌍 (중복 key, SVG, 주석, 공백 포함) | 결과 DOM이 새 트리와 같고 두 북마크가 동기화됨 | EC-013 무작위 트리 500쌍: patch 결과가 새 트리와 같고 북마크가 동기화된다 | 통과 |
 | EC-014 | 공유 트리 사이를 무작위로 300번 이동 (뒤로/앞으로) | 매번 DOM과 북마크가 정확함 | EC-014 무작위 이력 이동: 공유 트리 사이를 앞뒤로 오가도 DOM과 북마크가 정확하다 | 통과 |
+| EC-018 | 연산별로 바꾼 DOM 기록 | `changed_records`에 `{ operation, dom_node }`를 순서대로 담고 `changed_dom_nodes`와 같은 노드 (화면은 주석·공백 변경을 하이라이트에서 뺄 때 사용) | EC-018 patch 결과는 연산마다 바꾼 DOM 노드를 changed_records로 알려 준다 | 통과 |
 | EC-015 | 1000단계 중첩 | mount와 patch 성공 | EC-015 깊은 중첩(1000단계, 브라우저 파서 한도 512의 두 배)도 mount와 patch가 된다 | 통과 |
 | EC-016 | 이미 문서에서 분리된 노드를 `REMOVE` | `parentNode`가 없으면 제거를 건너뜀 | 없음 | 미검증 |
 | EC-017 | patch 중 `MutationObserver` 콜백 | 콜백은 microtask로 patch가 끝난 뒤 실행되므로 patch 도중 재진입이 없음 | 없음 (대역에 MutationObserver 없음) | 미검증 |
@@ -53,6 +54,7 @@
 | EC-013 무작위 트리 500쌍: patch 결과가 새 트리와 같고 북마크가 동기화된다 | diff와 patch의 정확성 | EC-013 |
 | EC-014 무작위 이력 이동: 공유 트리 사이를 앞뒤로 오가도 DOM과 북마크가 정확하다 | 이력 이동과 노드 공유 | EC-014 |
 | EC-015 깊은 중첩(1000단계, 브라우저 파서 한도 512의 두 배)도 mount와 patch가 된다 | 깊은 중첩 | EC-015 |
+| EC-018 patch 결과는 연산마다 바꾼 DOM 노드를 changed_records로 알려 준다 | 연산별 변경 기록 | EC-018 |
 
 ## 미검증 항목
 

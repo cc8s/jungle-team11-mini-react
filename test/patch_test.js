@@ -287,3 +287,16 @@ test('EC-015 깊은 중첩(1000단계, 브라우저 파서 한도 512의 두 배
   patch_to(environment, old_tree, new_tree);
   assert.equal(environment.container_element.textContent, '후');
 });
+
+test('EC-018 patch 결과는 연산마다 바꾼 DOM 노드를 changed_records로 알려 준다', () => {
+  const old_tree = fragment_node([comment_node('메모'), element_node('p', null, [text_node('전')])]);
+  const new_tree = fragment_node([comment_node('메모 🙂'), element_node('p', null, [text_node('후')])]);
+  const environment = create_environment(old_tree);
+  const { changed_records, changed_dom_nodes } = patch_to(environment, old_tree, new_tree);
+  assert.equal(changed_records.length, 2);
+  assert.deepEqual(changed_records.map((change_record) => change_record.dom_node), changed_dom_nodes);
+  const [comment_record, text_record] = changed_records;
+  assert.equal(comment_record.operation.old_node, old_tree.children[0]);
+  assert.equal(comment_record.dom_node.data, '메모 🙂');
+  assert.equal(text_record.dom_node.data, '후');
+});

@@ -149,17 +149,18 @@ function diff_children(old_parent, new_parent, operations) {
 
   new_children.forEach((new_child, index) => {
     const matched_old_child = matched_old_children[index];
-    if (matched_old_child) diff_matched_pair(matched_old_child, new_child, operations);
+    if (matched_old_child) diff_matched_pair(matched_old_child, new_child, operations, old_parent);
   });
 }
 
-function diff_matched_pair(old_node, new_node, operations) {
+// parent_node는 이전 트리의 부모다. TEXT 연산에 실어서 화면 변화 여부(예: <pre> 안 공백)를 판단할 수 있게 한다.
+function diff_matched_pair(old_node, new_node, operations, parent_node) {
   // 노드 공유 덕분에 같은 참조면 하위 트리 전체가 같으므로 비교를 건너뛴다.
   if (old_node === new_node) return;
   operations.push({ kind: operation_kinds.bind, old_node, new_node });
   if (is_text_like_node(old_node)) {
     if (old_node.text !== new_node.text) {
-      operations.push({ kind: operation_kinds.text, old_node, new_node, text: new_node.text });
+      operations.push({ kind: operation_kinds.text, parent_node, old_node, new_node, text: new_node.text });
     }
     return;
   }
@@ -177,7 +178,7 @@ export function diff_trees(old_root, new_root) {
     operations.push({ kind: operation_kinds.replace, old_node: old_root, new_node: new_root });
     return operations;
   }
-  diff_matched_pair(old_root, new_root, operations);
+  diff_matched_pair(old_root, new_root, operations, null);
   return operations;
 }
 

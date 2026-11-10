@@ -16,7 +16,12 @@ import {
   commit_tree,
   commit_outcomes,
 } from './state_history.js';
-import { summarize_operations, format_operation_summary } from './operation_summary.js';
+import {
+  summarize_operations,
+  format_operation_summary,
+  is_hidden_operation,
+  is_hidden_only_summary,
+} from './operation_summary.js';
 import { format_relative_time } from './relative_time.js';
 import { resolve_page_name } from './page_route.js';
 
@@ -52,8 +57,9 @@ function entry_label(entry) {
   return `v${entry.entry_id}`;
 }
 
-function record_entry_details(entry, summary_text) {
-  entry_details_by_id.set(entry.entry_id, { summary_text, confirmed_at_ms: Date.now() });
+// is_hidden_only: 주석·공백만 바뀌어 실제 영역 화면에는 변화가 없는 상태. 카드 요약을 한 단계 연하게 보여 준다.
+function record_entry_details(entry, summary_text, is_hidden_only = false) {
+  entry_details_by_id.set(entry.entry_id, { summary_text, is_hidden_only, confirmed_at_ms: Date.now() });
 }
 
 // 이력에서 버려진 상태의 카드 정보도 함께 지운다.
@@ -91,7 +97,7 @@ function create_history_card(entry, history_index) {
   head_element.append(badge_element, name_element);
 
   const summary_element = document.createElement('span');
-  summary_element.className = 'history_summary';
+  summary_element.className = entry_details?.is_hidden_only ? 'history_summary history_summary_quiet' : 'history_summary';
   summary_element.textContent = entry_details?.summary_text ?? '';
 
   const time_element = document.createElement('span');
@@ -158,8 +164,11 @@ function highlight_dom_nodes(changed_dom_nodes) {
 
 function patch_real_area(current_tree, target_tree) {
   const operations = diff_trees(current_tree, target_tree);
-  const { changed_dom_nodes } = apply_operations(bookmark_registry, operations, document);
-  highlight_dom_nodes(changed_dom_nodes);
+  const { changed_records } = apply_operations(bookmark_registry, operations, document);
+  // 주석·공백처럼 화면에 보이지 않는 변경은 하이라이트하지 않는다(부모 전체가 깜빡여 헷갈리지 않도록).
+  highlight_dom_nodes(
+    changed_records.filter((change_record) => !is_hidden_operation(change_record.operation)).map((change_record) => change_record.dom_node),
+  );
   return operations;
 }
 
@@ -176,7 +185,9 @@ function handle_patch() {
   if (commit_result.outcome === commit_outcomes.appended) {
     // 뒤로 간 상태에서 고쳤다면 뒤쪽 상태는 버려지고 새 상태가 바로 뒤에 붙는다(브라우저 방식).
     forget_entry_details(commit_result.discarded_entries);
-    record_entry_details(commit_result.entry, format_operation_summary(summarize_operations(operations)));
+    // 화면 변화가 없는 변경(주석, 공백)도 Patch 기록으로 남긴다.
+    const operation_summary = summarize_operations(operations);
+    record_entry_details(commit_result.entry, format_operation_summary(operation_summary), is_hidden_only_summary(operation_summary));
   }
   update_controls();
 }

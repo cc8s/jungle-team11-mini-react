@@ -99,6 +99,12 @@ export function mount_tree(bookmark_registry, container_element, root_node, owne
 export function apply_operations(bookmark_registry, operations, owner_document) {
   if (!Array.isArray(operations)) throw new TypeError('operations는 배열이어야 합니다');
   const changed_dom_nodes = [];
+  // 어떤 연산이 어떤 DOM을 바꿨는지 함께 남겨, 화면 쪽에서 연산 종류에 따라 표시 여부를 고를 수 있게 한다.
+  const changed_records = [];
+  const record_change = (operation, dom_node) => {
+    changed_dom_nodes.push(dom_node);
+    changed_records.push({ operation, dom_node });
+  };
 
   // 떼어 낼 DOM은 적용 전에 미리 찾아 둔다. 앞선 ADD가 같은 Virtual DOM 객체를 새 DOM에 다시 연결해도
   // 원래 자리의 DOM을 지우게 되고, 북마크가 없으면 DOM을 하나도 바꾸기 전에 오류를 낸다.
@@ -118,7 +124,7 @@ export function apply_operations(bookmark_registry, operations, owner_document) 
       case operation_kinds.text: {
         const text_dom_node = find_dom_node(bookmark_registry, operation.old_node);
         text_dom_node.data = operation.text;
-        changed_dom_nodes.push(text_dom_node);
+        record_change(operation, text_dom_node);
         break;
       }
       case operation_kinds.attributes: {
@@ -129,7 +135,7 @@ export function apply_operations(bookmark_registry, operations, owner_document) 
         for (const attribute_name of Object.keys(operation.changed_attributes)) {
           element_dom_node.setAttribute(attribute_name, operation.changed_attributes[attribute_name]);
         }
-        changed_dom_nodes.push(element_dom_node);
+        record_change(operation, element_dom_node);
         break;
       }
       case operation_kinds.remove: {
@@ -142,7 +148,7 @@ export function apply_operations(bookmark_registry, operations, owner_document) 
         const parent_dom_node = find_dom_node(bookmark_registry, operation.parent_node);
         const added_dom_node = create_dom_tree(bookmark_registry, operation.new_node, require_document(owner_document));
         parent_dom_node.insertBefore(added_dom_node, parent_dom_node.childNodes[operation.index] ?? null);
-        changed_dom_nodes.push(added_dom_node);
+        record_change(operation, added_dom_node);
         break;
       }
       case operation_kinds.move: {
@@ -150,7 +156,7 @@ export function apply_operations(bookmark_registry, operations, owner_document) 
         const moved_dom_node = find_dom_node(bookmark_registry, operation.node);
         const reference_dom_node = parent_dom_node.childNodes[operation.index] ?? null;
         if (reference_dom_node !== moved_dom_node) parent_dom_node.insertBefore(moved_dom_node, reference_dom_node);
-        changed_dom_nodes.push(moved_dom_node);
+        record_change(operation, moved_dom_node);
         break;
       }
       case operation_kinds.replace: {
@@ -160,7 +166,7 @@ export function apply_operations(bookmark_registry, operations, owner_document) 
         unbind_subtree(bookmark_registry, old_dom_node);
         const new_dom_node = create_dom_tree(bookmark_registry, operation.new_node, require_document(owner_document));
         parent_dom_node.replaceChild(new_dom_node, old_dom_node);
-        changed_dom_nodes.push(new_dom_node);
+        record_change(operation, new_dom_node);
         break;
       }
       default:
@@ -168,5 +174,5 @@ export function apply_operations(bookmark_registry, operations, owner_document) 
     }
   }
 
-  return { changed_dom_nodes };
+  return { changed_dom_nodes, changed_records };
 }

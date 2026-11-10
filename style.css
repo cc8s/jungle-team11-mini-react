@@ -603,6 +603,10 @@ a:focus-visible {
   line-height: 1.5;
 }
 
+.history_summary_quiet {
+  color: var(--soft_gray_color);
+}
+
 .history_time {
   display: flex;
   justify-content: space-between;
