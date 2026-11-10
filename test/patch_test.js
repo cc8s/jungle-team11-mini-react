@@ -17,6 +17,7 @@ import {
   find_dom_node,
   find_virtual_node,
   create_dom_tree,
+  unmount_tree,
 } from '../src/patch.js';
 import { fake_document, svg_namespace_uri } from './support/fake_dom.js';
 
@@ -299,4 +300,25 @@ test('EC-018 patch 결과는 연산마다 바꾼 DOM 노드를 changed_records�
   assert.equal(comment_record.operation.old_node, old_tree.children[0]);
   assert.equal(comment_record.dom_node.data, '메모 🙂');
   assert.equal(text_record.dom_node.data, '후');
+});
+
+test('EC-019 unmount_tree는 내용을 지우고 컨테이너를 포함한 양쪽 북마크를 해제한다', () => {
+  const initial_tree = list_tree(['todo_a', 'todo_b']);
+  const environment = create_environment(initial_tree);
+  const first_item_node = initial_tree.children[0].children[0];
+  const first_item_dom = find_dom_node(environment.bookmark_registry, first_item_node);
+  unmount_tree(environment.bookmark_registry, environment.container_element);
+  assert.equal(environment.container_element.childNodes.length, 0);
+  assert.equal(find_virtual_node(environment.container_element), null);
+  assert.equal(find_virtual_node(first_item_dom), null);
+  assert.throws(() => find_dom_node(environment.bookmark_registry, initial_tree), /북마크된 DOM 노드가 없습니다/);
+  assert.throws(() => find_dom_node(environment.bookmark_registry, first_item_node), /북마크된 DOM 노드가 없습니다/);
+});
+
+test('EC-020 unmount_tree 반복 호출(중복 해제)은 안전하고, 컨테이너가 없으면 TypeError', () => {
+  const environment = create_environment(list_tree(['todo_a']));
+  unmount_tree(environment.bookmark_registry, environment.container_element);
+  assert.doesNotThrow(() => unmount_tree(environment.bookmark_registry, environment.container_element));
+  assert.throws(() => unmount_tree(environment.bookmark_registry, null), TypeError);
+  assert.throws(() => unmount_tree(environment.bookmark_registry, {}), TypeError);
 });

@@ -8,6 +8,7 @@
 | DOM → Virtual DOM | `dom_node.__virtual_node` | 이벤트나 제거 처리에서 Virtual DOM을 바로 찾음 |
 
 - 북마크 등록과 해제는 이 모듈(`bind_bookmark`, `unbind_subtree`)에서만 한다.
+- `unmount_tree`는 `mount_tree`로 그린 내용을 지우고 컨테이너를 포함한 양쪽 북마크를 해제한다. `FunctionComponent.unmount()`가 쓴다.
 - `REMOVE`와 `REPLACE`가 떼어 낼 DOM은 적용 전에 모두 찾아 둔다. 북마크가 빠진 연산이 있으면 DOM을 바꾸기 전에 오류를 낸다.
 - 제거된 하위 트리는 DOM 쪽 북마크를 따라 해제한다. 같은 Virtual DOM 객체가 그사이 다른 DOM에 다시 연결됐다면 그 연결은 지우지 않는다.
 - 바뀌지 않은 DOM 노드는 그대로 두므로 `input`의 property 값, 포커스, 선택 영역이 유지된다.
@@ -32,6 +33,8 @@
 | EC-014 | 공유 트리 사이를 무작위로 300번 이동 (뒤로/앞으로) | 매번 DOM과 북마크가 정확함 | EC-014 무작위 이력 이동: 공유 트리 사이를 앞뒤로 오가도 DOM과 북마크가 정확하다 | 통과 |
 | EC-018 | 연산별로 바꾼 DOM 기록 | `changed_records`에 `{ operation, dom_node }`를 순서대로 담고 `changed_dom_nodes`와 같은 노드 (화면은 주석·공백 변경을 하이라이트에서 뺄 때 사용) | EC-018 patch 결과는 연산마다 바꾼 DOM 노드를 changed_records로 알려 준다 | 통과 |
 | EC-015 | 1000단계 중첩 | mount와 patch 성공 | EC-015 깊은 중첩(1000단계, 브라우저 파서 한도 512의 두 배)도 mount와 patch가 된다 | 통과 |
+| EC-019 | `unmount_tree` | 내용을 지우고 컨테이너를 포함한 양쪽 북마크 해제 | EC-019 unmount_tree는 내용을 지우고 컨테이너를 포함한 양쪽 북마크를 해제한다 | 통과 |
+| EC-020 | `unmount_tree` 반복 호출(중복 해제), 컨테이너가 `null`·일반 객체 | 반복은 안전, 컨테이너가 아니면 `TypeError` | EC-020 unmount_tree 반복 호출(중복 해제)은 안전하고, 컨테이너가 없으면 TypeError | 통과 |
 | EC-016 | 이미 문서에서 분리된 노드를 `REMOVE` | `parentNode`가 없으면 제거를 건너뜀 | 없음 | 미검증 |
 | EC-017 | patch 중 `MutationObserver` 콜백 | 콜백은 microtask로 patch가 끝난 뒤 실행되므로 patch 도중 재진입이 없음 | 없음 (대역에 MutationObserver 없음) | 미검증 |
 
@@ -55,6 +58,8 @@
 | EC-014 무작위 이력 이동: 공유 트리 사이를 앞뒤로 오가도 DOM과 북마크가 정확하다 | 이력 이동과 노드 공유 | EC-014 |
 | EC-015 깊은 중첩(1000단계, 브라우저 파서 한도 512의 두 배)도 mount와 patch가 된다 | 깊은 중첩 | EC-015 |
 | EC-018 patch 결과는 연산마다 바꾼 DOM 노드를 changed_records로 알려 준다 | 연산별 변경 기록 | EC-018 |
+| EC-019 unmount_tree는 내용을 지우고 컨테이너를 포함한 양쪽 북마크를 해제한다 | unmount 정리 | EC-019 |
+| EC-020 unmount_tree 반복 호출(중복 해제)은 안전하고, 컨테이너가 없으면 TypeError | 중복 해제, 입력 검증 | EC-020 |
 
 ## 미검증 항목
 

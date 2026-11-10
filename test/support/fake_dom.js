@@ -12,12 +12,111 @@ function create_dom_exception(exception_name, message_text) {
   return dom_exception;
 }
 
+// DOM 표준 Event의 대역. 이 프로젝트가 쓰는 속성과 메서드만 둔다.
+export class fake_event {
+  constructor(event_type, event_options = {}) {
+    this.type = String(event_type);
+    this.bubbles = Boolean(event_options.bubbles);
+    this.cancelable = Boolean(event_options.cancelable);
+    this.target = null;
+    this.currentTarget = null;
+    this.eventPhase = 0;
+    this.defaultPrevented = false;
+    this.is_propagation_stopped = false;
+    this.is_immediate_propagation_stopped = false;
+  }
+
+  // DOM 표준: stopPropagation()을 부르면 cancelBubble이 true가 된다.
+  get cancelBubble() {
+    return this.is_propagation_stopped;
+  }
+
+  stopPropagation() {
+    this.is_propagation_stopped = true;
+  }
+
+  stopImmediatePropagation() {
+    this.is_propagation_stopped = true;
+    this.is_immediate_propagation_stopped = true;
+  }
+
+  preventDefault() {
+    if (this.cancelable) this.defaultPrevented = true;
+  }
+}
+
 class fake_node {
   constructor(owner_document, node_type) {
     this.ownerDocument = owner_document;
     this.nodeType = node_type;
     this.parentNode = null;
     this.childNodes = [];
+    this.registered_listeners = [];
+  }
+
+  // DOM 표준: 같은 type, callback, capture 조합은 한 번만 등록된다.
+  addEventListener(event_type, listener_callback, listener_options = false) {
+    if (typeof listener_callback !== 'function') return;
+    const is_capture = typeof listener_options === 'boolean' ? listener_options : Boolean(listener_options?.capture);
+    const is_duplicate = this.registered_listeners.some(
+      (registered_listener) =>
+        registered_listener.event_type === event_type &&
+        registered_listener.listener_callback === listener_callback &&
+        registered_listener.is_capture === is_capture,
+    );
+    if (!is_duplicate) {
+      this.registered_listeners.push({ event_type, listener_callback, is_capture, is_removed: false });
+    }
+  }
+
+  removeEventListener(event_type, listener_callback, listener_options = false) {
+    const is_capture = typeof listener_options === 'boolean' ? listener_options : Boolean(listener_options?.capture);
+    const listener_index = this.registered_listeners.findIndex(
+      (registered_listener) =>
+        registered_listener.event_type === event_type &&
+        registered_listener.listener_callback === listener_callback &&
+        registered_listener.is_capture === is_capture,
+    );
+    if (listener_index === -1) return;
+    // 전파 중에 제거된 리스너는 호출되지 않는다(removed 플래그).
+    this.registered_listeners[listener_index].is_removed = true;
+    this.registered_listeners.splice(listener_index, 1);
+  }
+
+  // DOM 표준의 dispatch: capture(루트 → 부모) → target(capture 먼저, 그다음 bubble 리스너) → bubble(부모 → 루트).
+  dispatchEvent(dispatched_event) {
+    if (!(dispatched_event instanceof fake_event)) throw new TypeError('Event가 아닙니다');
+    dispatched_event.target = this;
+    const propagation_path = [];
+    for (let current_node = this; current_node; current_node = current_node.parentNode) {
+      propagation_path.push(current_node);
+    }
+    const invoke_listeners = (current_node, phase_number, should_invoke) => {
+      if (dispatched_event.is_propagation_stopped) return;
+      dispatched_event.currentTarget = current_node;
+      dispatched_event.eventPhase = phase_number;
+      // 전파 중 추가된 리스너는 이번 전파에서 호출되지 않도록 목록을 복사한다.
+      for (const registered_listener of [...current_node.registered_listeners]) {
+        if (registered_listener.is_removed) continue;
+        if (registered_listener.event_type !== dispatched_event.type) continue;
+        if (!should_invoke(registered_listener)) continue;
+        registered_listener.listener_callback.call(current_node, dispatched_event);
+        if (dispatched_event.is_immediate_propagation_stopped) return;
+      }
+    };
+    for (let path_index = propagation_path.length - 1; path_index >= 1; path_index -= 1) {
+      invoke_listeners(propagation_path[path_index], 1, (registered_listener) => registered_listener.is_capture);
+    }
+    invoke_listeners(this, 2, (registered_listener) => registered_listener.is_capture);
+    invoke_listeners(this, 2, (registered_listener) => !registered_listener.is_capture);
+    if (dispatched_event.bubbles) {
+      for (let path_index = 1; path_index < propagation_path.length; path_index += 1) {
+        invoke_listeners(propagation_path[path_index], 3, (registered_listener) => !registered_listener.is_capture);
+      }
+    }
+    dispatched_event.currentTarget = null;
+    dispatched_event.eventPhase = 0;
+    return !dispatched_event.defaultPrevented;
   }
 
   get firstChild() {
@@ -132,6 +231,7 @@ class fake_character_data extends fake_node {
   }
 }
 
+const form_control_names = new Set(['input', 'textarea', 'select', 'button']);
 const valid_attribute_name_pattern = /^[^\s"'>/=\u0000]+$/;
 
 class fake_element extends fake_node {
@@ -179,12 +279,58 @@ class fake_element extends fake_node {
     const attribute_index = this.attributes.findIndex((attribute_node) => attribute_node.name === normalized_name);
     if (attribute_index !== -1) this.attributes.splice(attribute_index, 1);
   }
+
+  // HTML 표준: input의 value property는 사용자가 고치기 전(dirty 아님)에는 value attribute를 따르고,
+  // 한 번 고치면 attribute와 따로 논다. form.reset()은 dirty 표시를 지워 다시 attribute를 따르게 한다.
+  get value() {
+    if (this.dirty_value !== undefined) return this.dirty_value;
+    return this.getAttribute('value') ?? '';
+  }
+
+  set value(next_value) {
+    this.dirty_value = String(next_value ?? '');
+  }
+
+  focus() {
+    this.ownerDocument.activeElement = this;
+  }
+
+  list_form_controls() {
+    const form_controls = [];
+    const pending_nodes = [...this.childNodes].reverse();
+    while (pending_nodes.length > 0) {
+      const current_node = pending_nodes.pop();
+      if (current_node.nodeType !== 1) continue;
+      if (form_control_names.has(current_node.localName)) form_controls.push(current_node);
+      for (let index = current_node.childNodes.length - 1; index >= 0; index -= 1) pending_nodes.push(current_node.childNodes[index]);
+    }
+    return form_controls;
+  }
+
+  // HTMLFormElement.elements: 폼 안의 컨트롤을 문서 순서로 담고, namedItem은 id 또는 name이 같은 첫 컨트롤을 찾는다.
+  get elements() {
+    if (this.localName !== 'form') return undefined;
+    const form_controls = this.list_form_controls();
+    return {
+      length: form_controls.length,
+      namedItem: (control_name) =>
+        form_controls.find(
+          (form_control) => form_control.getAttribute('id') === control_name || form_control.getAttribute('name') === control_name,
+        ) ?? null,
+    };
+  }
+
+  reset() {
+    if (this.localName !== 'form') return;
+    for (const form_control of this.list_form_controls()) delete form_control.dirty_value;
+  }
 }
 
 export class fake_document extends fake_node {
   constructor() {
     super(null, 9);
     this.ownerDocument = null;
+    this.activeElement = null;
   }
 
   createElement(local_name) {

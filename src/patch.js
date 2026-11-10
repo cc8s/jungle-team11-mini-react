@@ -95,6 +95,20 @@ export function mount_tree(bookmark_registry, container_element, root_node, owne
   return container_element;
 }
 
+// mount_tree로 그린 내용을 모두 지우고 컨테이너를 포함한 양쪽 북마크를 해제한다. 반복 호출해도 안전하다.
+export function unmount_tree(bookmark_registry, container_element) {
+  if (!container_element || typeof container_element.removeChild !== 'function') {
+    throw new TypeError('컨테이너 요소가 필요합니다');
+  }
+  while (container_element.firstChild) {
+    const existing_child = container_element.firstChild;
+    unbind_subtree(bookmark_registry, existing_child);
+    container_element.removeChild(existing_child);
+  }
+  unbind_subtree(bookmark_registry, container_element);
+  return container_element;
+}
+
 // 연산을 순서대로 적용하고, 하이라이트할 DOM 노드 목록을 돌려준다.
 export function apply_operations(bookmark_registry, operations, owner_document) {
   if (!Array.isArray(operations)) throw new TypeError('operations는 배열이어야 합니다');
