@@ -1,7 +1,8 @@
 // hook. 계약은 tests/unit/hooks.test.js · tests/unit/effects.test.js 맨 위 주석.
 //
 // 모두 component.js 의 useHookSlot 위에 만든다: 호출 1번 = 슬롯 1개, 루트 fn 렌더 중에만.
-import { getCurrentComponent, isUnmounted, useHookSlot, withoutHooks } from './component.js';
+import { getCurrentComponent, isBusy, isUnmounted, renderCount, useHookSlot, withoutHooks } from './component.js';
+import { isBatching, markDirty } from './scheduler.js';
 
 // [state, setState]. 슬롯은 { state, setState } 이고 setState 는 슬롯과 함께 한 번만 만든다.
 export function useState(initial) {
@@ -87,6 +88,15 @@ function runUpdater(updater, prev) {
 }
 
 // 상태가 바뀐 컴포넌트를 다시 렌더한다. 렌더·commit·effect 단계 중이면 component 의 재진입 규칙이 표시만 한다.
+// batch 안이면 표시만 하고 가장 바깥 batch 가 끝날 때 다시 그린다. 그 사이 unmount 됐거나
+// 이미 다시 렌더됐으면(다른 컴포넌트의 effect 가 부른 동기 setState 등) 건너뛴다.
 function requestUpdate(comp) {
+  if (isBatching() && !isBusy(comp)) {
+    const seen = renderCount(comp);
+    markDirty(comp, () => {
+      if (!isUnmounted(comp) && renderCount(comp) === seen) comp.update();
+    });
+    return;
+  }
   comp.update();
 }

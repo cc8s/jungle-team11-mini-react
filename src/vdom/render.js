@@ -1,5 +1,6 @@
 // VNode → 실제 DOM. setProp / removeProp 는 patch(#5)가 속성을 바꿀 때 그대로 다시 쓴다.
 import { isText } from './vnode.js';
+import { batch } from '../core/scheduler.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const HTML_NS = 'http://www.w3.org/1999/xhtml';
@@ -121,9 +122,11 @@ function unmarkControlled(el, name) {
 const RESTORE_EVENTS = new Set(['input', 'change', 'click']);
 const restoreScheduled = new WeakSet();
 
+// 핸들러 호출 1번 = batch 1개: 안의 setState 는 핸들러가 끝날 때 컴포넌트마다 한 번 렌더한다.
+// 되돌리기는 다음 작업에서 하므로 batch 렌더가 끝난 뒤에 화면 값을 확인한다.
 function runHandler(el, handler, event) {
   if (RESTORE_EVENTS.has(event?.type)) scheduleRestore(event, el);
-  return handler.call(el, event);
+  return batch(() => handler.call(el, event));
 }
 
 // 되돌리기는 다음 작업에서 한다. click 의 activation 은 dispatch 가 끝난 뒤에 input / change 를 내고
