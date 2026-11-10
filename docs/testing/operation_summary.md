@@ -26,4 +26,4 @@
 
 | 항목 | 이유 | 필요한 검증 방법 |
 | --- | --- | --- |
-| 화면의 연산 로그 표시 | DOM 출력은 `app.js` 담당 | 브라우저에서 Patch 후 "마지막 patch 연산" 패널 확인. 2026-11-10 수동 확인 |
+| State History 카드의 변경 요약 표시 | DOM 출력은 `app.js` 담당. `describe_operation`과 `select_visible_operations`는 현재 화면에서 쓰지 않음(연산 로그 패널 제거) | 2026-11-10 브라우저 수동 확인: Patch 후 카드에 "1개 변경 반영 (TEXT 1)" 표시 |
