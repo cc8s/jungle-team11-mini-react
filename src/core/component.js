@@ -16,8 +16,9 @@ const MAX_RERENDERS = 25;
 // 지금 루트 fn 을 실행 중인 컴포넌트. 그 밖에서는 null.
 let current = null;
 
-// hook 슬롯의 init 을 실행 중이다. 그 안에서 hook 을 부르면 슬롯 순서가 뒤섞인다.
-let initializing = false;
+// hook 슬롯의 init 을 실행 중인 컴포넌트. 그 안에서 같은 컴포넌트의 hook 을 부르면 슬롯 순서가 뒤섞인다.
+// init 안에서 다른 컴포넌트를 mount 하는 것은 그 컴포넌트의 슬롯을 쓰므로 괜찮다.
+let initializing = null;
 
 // 공개 필드가 아닌 컴포넌트 내부 상태.
 //   rendering: 루트 fn 또는 expand 실행 중   committing: 새 트리를 DOM 에 반영하는 중
@@ -32,8 +33,8 @@ export function getCurrentComponent() {
 // 현재 컴포넌트의 다음 hook 슬롯. 처음 쓰는 슬롯이면 init() 결과를 저장한다.
 // init 이 던지면 슬롯도 hookIndex 도 그대로 둔다: 그 호출은 hook 호출로 세지 않는다.
 export function useHookSlot(init) {
-  if (initializing) throw new Error('hook 의 init 안에서는 hook 을 부를 수 없습니다');
   const comp = current;
+  if (comp != null && comp === initializing) throw new Error('hook 의 init 안에서는 hook 을 부를 수 없습니다');
   if (comp == null) {
     throw new Error('hook 은 루트 컴포넌트 함수가 렌더되는 동안에만 부를 수 있습니다');
   }
@@ -44,11 +45,12 @@ export function useHookSlot(init) {
   }
   if (i >= comp.hooks.length) {
     let value;
-    initializing = true;
+    const outer = initializing;
+    initializing = comp;
     try {
       value = init();
     } finally {
-      initializing = false;
+      initializing = outer;
     }
     comp.hooks.push(value);
   }
