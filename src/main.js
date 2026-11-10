@@ -5,6 +5,7 @@ import { mountApp } from './app/app.js';
 
 const root = document.getElementById('root');
 const buttons = document.querySelectorAll('[data-tab]');
+const pageTitle = document.querySelector('[data-page-title]');
 
 // 지금 mount 된 Phase 2 App. 탭을 떠날 때 unmount 해 effect cleanup(popstate 리스너 해제)을 부른다.
 let app = null;
@@ -20,7 +21,11 @@ function show(tab) {
   } else {
     app = mountApp(root);
   }
-  buttons.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.tab === tab)));
+  buttons.forEach((button) => {
+    const current = button.dataset.tab === tab;
+    button.setAttribute('aria-pressed', String(current));
+    if (current && pageTitle) pageTitle.textContent = button.dataset.title;
+  });
 }
 
 buttons.forEach((button) => {
