@@ -86,7 +86,7 @@ function App({ begin }) {
     order[index] = k + 1;
   });
 
-  return h('div', { class: 'gomoku', 'data-testid': 'app' },
+  return h('div', { class: 'gomoku card', 'data-testid': 'app' },
     h(Toolbar, { status: statusText(winner, draw, next), stones: stonesText(board), onReset: handlers.reset }),
     h('div', { class: 'goban' },
       h(Lines, null),
@@ -110,7 +110,7 @@ function Toolbar({ status, stones, onReset }) {
   return h('div', { class: 'gomoku-bar' },
     h('p', { class: 'gomoku-status', 'data-testid': 'status' }, status),
     h('p', { class: 'gomoku-stones', 'data-testid': 'stones' }, stones),
-    h('button', { type: 'button', 'data-testid': 'reset', onClick: onReset }, '초기화'),
+    h('button', { type: 'button', class: 'ghost_button', 'data-testid': 'reset', onClick: onReset }, '초기화'),
   );
 }
 
@@ -141,9 +141,10 @@ function Cell({ index, stone, move, onClick }) {
 
 function createStats() {
   const el = document.createElement('aside');
-  el.className = 'stats';
+  el.className = 'stats card';
   el.dataset.testid = 'stats';
   const title = document.createElement('h2');
+  title.className = 'card_title';
   title.textContent = '마지막 조작';
   el.appendChild(title);
 

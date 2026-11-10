@@ -107,26 +107,35 @@ export function mountPhase1(container, { initialHTML = SAMPLE_HTML } = {}) {
 function buildLayout(container) {
   container.innerHTML = `
     <div class="phase1">
-      <section class="pane pane-real">
-        <h2>실제 영역</h2>
-        <div class="surface" data-testid="real"></div>
-      </section>
-      <section class="pane pane-source">
-        <h2>테스트 영역</h2>
-        <textarea class="source" data-testid="source" spellcheck="false" aria-label="테스트 영역 HTML"></textarea>
-        <h3>미리보기</h3>
-        <div class="surface preview" data-testid="preview"></div>
-      </section>
-      <div class="toolbar">
-        <button type="button" data-testid="back" aria-label="뒤로">◀ 뒤로</button>
-        <span class="position" data-testid="history"></span>
-        <button type="button" data-testid="forward" aria-label="앞으로">앞으로 ▶</button>
-        <button type="button" class="primary" data-testid="patch">Patch</button>
+      <div class="phase1_body">
+        <div class="phase1_cards">
+          <section class="card pane-real">
+            <h2 class="card_title">실제 영역</h2>
+            <div class="surface" data-testid="real"></div>
+          </section>
+          <section class="card pane-source">
+            <div class="card_head">
+              <h2 class="card_title">테스트 영역</h2>
+              <div class="card_actions">
+                <button type="button" class="ghost_button" data-testid="back" aria-label="뒤로" title="뒤로">‹<span class="button_text">뒤로</span></button>
+                <span class="position" data-testid="history"></span>
+                <button type="button" class="ghost_button" data-testid="forward" aria-label="앞으로" title="앞으로"><span class="button_text">앞으로</span>›</button>
+                <button type="button" class="primary_button" data-testid="patch">Patch</button>
+              </div>
+            </div>
+            <textarea class="source" data-testid="source" spellcheck="false" aria-label="테스트 영역 HTML"></textarea>
+            <h3 class="card_subtitle">미리보기</h3>
+            <div class="surface preview" data-testid="preview"></div>
+          </section>
+        </div>
       </div>
-      <section class="pane pane-log">
-        <h2>Patch 로그 <small>MutationObserver</small></h2>
+      <aside class="side_panel pane-log">
+        <div class="panel_head">
+          <h2 class="panel_title">Patch 로그</h2>
+          <span class="panel_meta">MutationObserver</span>
+        </div>
         <ol class="log" data-testid="log"></ol>
-      </section>
+      </aside>
     </div>`;
   const q = (id) => container.querySelector(`[data-testid="${id}"]`);
   return {
