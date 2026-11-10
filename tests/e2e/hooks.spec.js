@@ -173,3 +173,91 @@ test('E2E-HOOK-005 (e6·e7) 제어 textarea·select: mount 와 patch 모두 valu
 
   expect(result).toEqual({ mountSelect: 'b', mountArea: 'a', addedSelect: 'c', noteArea: 'a' });
 });
+
+// ── 재리뷰(#8): 되돌리기는 input/change/click dispatch 뒤에만, 그 이벤트 종류의 핸들러가 경로에 있을 때만 ──
+// 페이지 안에서 컴포넌트를 띄우는 공통 준비. kind 별 앱은 브라우저 쪽에서 만든다.
+async function mountKind(page, kind) {
+  await page.evaluate(async ({ src, kind }) => {
+    const { FunctionComponent } = await import(`${src}/core/component.js`);
+    const { useState } = await import(`${src}/core/hooks.js`);
+    const { h } = await import(`${src}/vdom/vnode.js`);
+    const container = document.createElement('div');
+    container.dataset.testid = 'hook-root';
+    document.body.appendChild(container);
+
+    const checkbox = (wrap, extra = {}) => () => {
+      const [on, setOn] = useState(false);
+      const box = h('input', { type: 'checkbox', checked: on, onChange: (e) => setOn(e.target.checked), ...extra });
+      return h('div', null, wrap(box), h('span', { class: 'state' }, on ? 'on' : 'off'));
+    };
+    const apps = {
+      'cb-parent-click': checkbox((box) => h('div', { onClick: () => {} }, box)),
+      'cb-self-click': checkbox((box) => box, { onClick: (e) => e.stopPropagation() }),
+      'cb-tr-click': checkbox((box) => h('table', null, h('tbody', null, h('tr', { onClick: () => {} }, h('td', null, box))))),
+      radios: () => {
+        const [sel] = useState('a');
+        return h('form', null,
+          h('input', { type: 'radio', name: 'g', value: 'a', checked: sel === 'a', onChange: () => {} }),
+          h('input', { type: 'radio', name: 'g', value: 'b', checked: sel === 'b', onChange: () => {} }),
+        );
+      },
+      'text-plain': () => {
+        const [v, setV] = useState('');
+        return h('div', null, h('input', { value: v, onChange: (e) => setV(e.target.value) }), h('span', { class: 'state' }, v));
+      },
+      'text-keydown': () => {
+        const [v, setV] = useState('');
+        return h('div', null,
+          h('input', { value: v, onChange: (e) => setV(e.target.value), onKeyDown: () => {}, onMouseMove: () => {} }),
+          h('span', { class: 'state' }, v));
+      },
+    };
+    new FunctionComponent(apps[kind]).mount(container);
+  }, { src: SRC, kind });
+}
+
+for (const kind of ['cb-parent-click', 'cb-self-click', 'cb-tr-click']) {
+  test(`E2E-HOOK-006 (r1) ${kind}: onChange 체크박스를 실제 클릭으로 켜고 끈다`, async ({ page }) => {
+    await mountKind(page, kind);
+    const box = root(page).locator('input');
+    const state = root(page).locator('span.state');
+
+    await box.click();
+    await expect(state).toHaveText('on', quick);
+    await expect(box).toBeChecked(quick);
+
+    await box.click();
+    await expect(state).toHaveText('off', quick);
+    await expect(box).not.toBeChecked(quick);
+  });
+}
+
+test('E2E-HOOK-007 (r2) 같은 name 제어 radio, 상태를 안 바꾸는 onChange: b 클릭 뒤 a checked, b unchecked', async ({ page }) => {
+  await mountKind(page, 'radios');
+  const [a, b] = [root(page).locator('input[value="a"]'), root(page).locator('input[value="b"]')];
+  await expect(a).toBeChecked(quick);
+
+  await b.click();
+  await page.evaluate(() => new Promise((r) => setTimeout(r, 50)));
+  await expect(a).toBeChecked(quick);
+  await expect(b).not.toBeChecked(quick);
+});
+
+test('E2E-HOOK-008 (r6) {value, onChange} input 에 실제 타이핑 "ab": onKeyDown·onMouseMove 유무와 무관하게 "ab", blur(change) 뒤 상태 "ab"', async ({ page }) => {
+  const results = {};
+  for (const kind of ['text-plain', 'text-keydown']) {
+    await page.goto('./');
+    await mountKind(page, kind);
+    const input = root(page).locator('input');
+    await input.click();
+    await input.pressSequentially('ab');
+    await input.hover();
+    await page.mouse.move(5, 5);
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 50)));
+    const typed = await input.inputValue();
+    await input.press('Tab'); // blur → change
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 50)));
+    results[kind] = [typed, await input.inputValue(), await root(page).locator('span.state').textContent()];
+  }
+  expect(results).toEqual({ 'text-plain': ['ab', 'ab', 'ab'], 'text-keydown': ['ab', 'ab', 'ab'] });
+});

@@ -45,11 +45,13 @@
 //     생기고 setState 도 새 함수다). mount 전에 setState 를 얻는 길은 첫 렌더 안뿐이고, 그 안에서
 //     부르는 것은 위의 "렌더 중" 규칙이다.
 //
-// ── #8 리뷰에서 재현된 결함으로 더한 규칙 (TC-HOOK-028~036, E2E-HOOK-*) ─────────────
+// ── #8 리뷰에서 재현된 결함으로 더한 규칙 (TC-HOOK-028~041, E2E-HOOK-*) ─────────────
 //   hook 실행 규칙
-//   - (e2) init 안에서는 hook 을 부를 수 없다: useState 의 lazy init, useHookSlot 의 init 안에서 hook 을
-//     부르면 "hook" Error (대소문자 무관). 슬롯이 뒤섞이지 않고, 예외는 init 예외 규칙대로 전파된다
-//     (mount 중이면 mount 실패, hooks [], container 그대로).
+//   - (e2) init 안에서는 **같은 컴포넌트의** hook 을 부를 수 없다: useState 의 lazy init, useHookSlot 의 init
+//     안에서 그 컴포넌트의 hook 을 부르면 "hook" Error (대소문자 무관). 슬롯이 뒤섞이지 않고, 예외는 init 예외
+//     규칙대로 전파된다 (mount 중이면 mount 실패, hooks [], container 그대로).
+//     (r8) init 안에서 **다른** FunctionComponent 를 mount 하는 것(그 컴포넌트가 자기 렌더에서 hook 을 쓰는 것)은
+//     허용한다: 둘 다 성공하고 각자 슬롯을 가지며, init 이 끝난 뒤 바깥 컴포넌트의 다음 hook 도 정상이다 (TC-HOOK-040).
 //   - (e3) commit 도중(첫 mount 의 render·appendChild, update 의 patch 적용) 같은 컴포넌트의 setState /
 //     update() 는 렌더 중과 같다: 상태만 저장하고 "다시 필요" 표시, commit 이 끝난 뒤 같은 호출 안에서
 //     동기로 재렌더. 재렌더 25회 한도는 렌더 중 재진입과 **공유**한다. 결과는 항상 DOM = render(comp.vnode).
@@ -57,14 +59,26 @@
 //   - (e4) 업데이터(setState 에 넘긴 함수) 실행 중에 setState(어느 슬롯이든) 를 부르면 Error. 업데이터 예외
 //     규칙대로 바깥 setState 가 그 예외를 던지고, 어느 상태도 바뀌지 않으며 렌더도 없다.
 //   제어 요소 (controlled) — 원칙: VNode 에 value / checked 가 있는 요소의 화면 값은 항상 마지막 VNode 값이다.
-//   - (e1) 컴포넌트가 붙인 이벤트 핸들러가 끝난 뒤, 상태가 안 바뀌어 렌더가 없어도 그 컴포넌트의 제어 요소
-//     value / checked 를 마지막 VNode 값으로 되돌린다. VNode 에 value / checked 가 없는 요소(비제어)는
-//     건드리지 않는다. 확인 시점: 이벤트 dispatch 가 끝나고 flush() 뒤.
+//   - (e1, 재리뷰 r1·r2·r6 으로 고침 — React 방식) 되돌리기 규칙
+//       언제: **값을 바꾸는 이벤트 input / change / click** 의 dispatch 가 끝난 **뒤**에만. 그 이벤트의 경로에
+//         이 라이브러리가 붙인 **그 이벤트 종류의** 핸들러(onInput / onChange / onClick)가 하나라도 있을 때만.
+//         keydown·keyup·mousemove·scroll 등 다른 이벤트는 (핸들러가 있어도) 되돌리기를 일으키지 않는다.
+//         핸들러 직후 동기로 되돌리지 않는다: click 의 activation 뒤에 오는 input / change 핸들러는 토글된
+//         값(e.target.checked 등)을 본다. 확인 시점: 이벤트(와 activation 이 낸 input/change)가 끝나고 flush() 뒤.
+//       무엇을: 그 이벤트 경로에 있는 제어 요소(VNode 에 value / checked 가 있는 요소)와, 경로에 있는 radio 와
+//         같은 name(같은 form, form 이 없으면 같은 문서)의 제어 radio 전부. 값은 마지막 VNode 값.
+//       VNode 에 value / checked 가 없는 요소(비제어)는 건드리지 않는다.
+//       예: `{value:v, onChange}` 인 input 에 타이핑 → input 이벤트 경로에 onInput 이 없으므로 되돌리지 않아
+//         화면에 타이핑한 값이 남고, blur 로 change 가 오면 onChange 가 상태를 바꾼다. onKeyDown 이 더 있어도 같다.
+//       예: 체크박스 `{checked:on, onChange: e => setOn(e.target.checked)}` 를 onClick 이 있는 부모 안에서
+//         클릭 → change 핸들러가 true 를 보고 상태 true, 화면 true.
 //   - (e5) 체크박스 onClick 에서 preventDefault + setState 해도, dispatch 가 끝난 뒤 .checked 는 상태 값이다
 //     (브라우저가 취소된 activation 을 dispatch 뒤에 되돌리는 것까지 이긴다). 실제 클릭은 e2e 로 고정.
 //   - (e6) textarea 에 value prop 과 텍스트 자식이 같이 있으면 .value 는 value prop (render·patch 모두).
 //   - (e7) select 의 value 는 option 을 다 만든 뒤 적용한 것과 같다 (render·patch 모두).
-//   render / patch 수준 단언은 TC-RND-016, TC-PATCH-113~114. 어느 계층에서 고치는지는 정하지 않는다.
+//     (r4·r5) option 의 value / selected 가 select 의 value 와 같은 patch 에서 바뀌어도 patch 결과 = render(new):
+//     select 의 value prop 이 이긴다 (TC-PATCH-115~116).
+//   render / patch 수준 단언은 TC-RND-016, TC-PATCH-113~116. 어느 계층에서 고치는지는 정하지 않는다.
 //
 // ── 정하지 않음 (테스트 없음) ────────────────────────────────────────────────────
 //   - 첫 mount 렌더에서 매번 setState 해 25회를 넘는 경우의 mount 결과.
@@ -1080,5 +1094,151 @@ describe('리뷰 보강(#8): 제어 요소 (화면 값 = 마지막 VNode 값)', 
     expect(area.value).toBe('z');
     expect(container.querySelector('select')).toBe(select);
     expect(container.querySelector('textarea')).toBe(area);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #8 수정 라운드 재리뷰에서 재현된 결함 (사용자 결정: React 방식). 계약은 맨 위 e1 절.
+describe('재리뷰(#8): 되돌리기는 input/change/click dispatch 뒤에만', () => {
+  // 클릭 가능한 제어 체크박스. wrap 은 체크박스를 감싸는 방식(부모 onClick 등)
+  const checkboxApp = (wrap, boxProps = {}) => () => {
+    const [on, setOn] = useState(false);
+    const box = h('input', { type: 'checkbox', checked: on, onChange: (e) => setOn(e.target.checked), ...boxProps });
+    return h('div', null, wrap(box), h('span', { class: 'state' }, on ? 'on' : 'off'));
+  };
+
+  it.each([
+    ['부모 div 에 onClick', (box) => h('div', { onClick: () => {} }, box), {}],
+    ['체크박스 자신에 onClick(stopPropagation) + onChange', (box) => box, { onClick: (e) => e.stopPropagation() }],
+    ['onClick 이 있는 tr 안의 체크박스', (box) => h('table', null, h('tbody', null, h('tr', { onClick: () => {} }, h('td', null, box)))), {}],
+  ])('TC-HOOK-037 (r1) %s: onChange 가 토글된 값을 보고 켜고 끌 수 있다', async (_name, wrap, boxProps) => {
+    const comp = new FunctionComponent(checkboxApp(wrap, boxProps));
+    const container = makeContainer();
+    comp.mount(container);
+    const box = container.querySelector('input');
+    const state = container.querySelector('span.state');
+
+    box.click();
+    await flush();
+    expect(state.textContent).toBe('on');
+    expect(box.checked).toBe(true);
+
+    box.click();
+    await flush();
+    expect(state.textContent).toBe('off');
+    expect(box.checked).toBe(false);
+  });
+
+  it('TC-HOOK-038 (r2) 같은 name 의 제어 radio: 상태를 안 바꾸는 onChange 면 b 클릭 뒤 a true·b false, 상태를 바꾸면 a false·b true', async () => {
+    const radios = (onChange) => () => {
+      const [sel, setSel] = useState('a');
+      return h('form', null,
+        h('input', { type: 'radio', name: 'g', value: 'a', checked: sel === 'a', onChange: onChange(setSel) }),
+        h('input', { type: 'radio', name: 'g', value: 'b', checked: sel === 'b', onChange: onChange(setSel) }),
+      );
+    };
+
+    const fixed = makeContainer();
+    new FunctionComponent(radios(() => () => {})).mount(fixed);
+    const [a, b] = fixed.querySelectorAll('input');
+    expect([a.checked, b.checked]).toEqual([true, false]);
+    b.click();
+    await flush();
+    expect([a.checked, b.checked]).toEqual([true, false]);
+
+    const live = makeContainer();
+    new FunctionComponent(radios((setSel) => (e) => setSel(e.target.value))).mount(live);
+    const [la, lb] = live.querySelectorAll('input');
+    lb.click();
+    await flush();
+    expect([la.checked, lb.checked]).toEqual([false, true]);
+    la.click();
+    await flush();
+    expect([la.checked, lb.checked]).toEqual([true, false]);
+  });
+
+  it('TC-HOOK-039 (r6) {value, onChange} input 에 타이핑: onKeyDown·onMouseMove 유무와 무관하게 화면 "ab", change 뒤 상태 "ab"', async () => {
+    const results = [];
+    for (const extra of [{}, { onKeyDown: () => {}, onMouseMove: () => {} }]) {
+      const comp = new FunctionComponent(() => {
+        const [v, setV] = useState('');
+        return h('div', null,
+          h('input', { value: v, onChange: (e) => setV(e.target.value), ...extra }),
+          h('span', null, v),
+        );
+      });
+      const container = makeContainer();
+      comp.mount(container);
+      const input = container.querySelector('input');
+      const span = container.querySelector('span');
+
+      for (const ch of 'ab') {
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: ch, bubbles: true }));
+        input.value += ch;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new KeyboardEvent('keyup', { key: ch, bubbles: true }));
+        await flush();
+      }
+      input.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+      input.dispatchEvent(new Event('scroll'));
+      await flush();
+      const typed = input.value;
+
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      await flush();
+      results.push([typed, input.value, span.textContent]);
+    }
+    expect(results).toEqual([
+      ['ab', 'ab', 'ab'],
+      ['ab', 'ab', 'ab'],
+    ]);
+  });
+
+  it('TC-HOOK-041 (r1) 즉시 되돌리지 않는다: onClick 이 있는 체크박스의 onChange 는 토글된 값(true)을 보고, 상태를 안 바꾸면 끝에는 false', async () => {
+    const seen = [];
+    const comp = new FunctionComponent(() => {
+      const [on] = useState(false);
+      return h('input', { type: 'checkbox', checked: on, onClick: () => {}, onChange: (e) => seen.push(e.target.checked) });
+    });
+    const container = makeContainer();
+    const box = comp.mount(container);
+
+    box.click();
+    await flush();
+    expect(seen).toEqual([true]);
+    expect(box.checked).toBe(false);
+  });
+});
+
+describe('재리뷰(#8): init 안의 다른 컴포넌트', () => {
+  it('TC-HOOK-040 (r8) lazy init 안에서 다른 FunctionComponent(useState 사용)를 mount 하면 둘 다 성공, 각자 슬롯', () => {
+    const boxB = makeContainer();
+    let setX;
+    const b = new FunctionComponent(() => {
+      const [x, s] = useState('b');
+      setX = s;
+      return h('i', null, x);
+    });
+    const a = new FunctionComponent(() => {
+      const [first] = useState(() => {
+        b.mount(boxB);
+        return 'a';
+      });
+      const [second] = useState('c');
+      return h('p', null, first + second);
+    });
+    const boxA = makeContainer();
+
+    expect(() => a.mount(boxA)).not.toThrow();
+    expect(boxA.innerHTML).toBe('<p>ac</p>');
+    expect(boxB.innerHTML).toBe('<i>b</i>');
+    expect(a.hooks).toHaveLength(2);
+    expect(b.hooks).toHaveLength(1);
+    expect(getCurrentComponent()).toBeNull();
+
+    a.update();
+    expect(boxA.innerHTML).toBe('<p>ac</p>');
+    setX('B');
+    return flush().then(() => expect(boxB.innerHTML).toBe('<i>B</i>'));
   });
 });
