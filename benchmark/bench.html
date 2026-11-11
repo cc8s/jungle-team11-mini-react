@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>song board benchmark</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <div id="song_board" class="area_grid song_board"></div>
+  <script src="src/bench_page.js"></script>
+  <script>
+    // ?implementation=mini_react | react_18
+    const implementation_name = new URLSearchParams(location.search).get('implementation');
+    const bundle_script = document.createElement('script');
+    bundle_script.src = `dist/${implementation_name}.js`;
+    document.head.append(bundle_script);
+  </script>
+</body>
+</html>
