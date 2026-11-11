@@ -6,16 +6,6 @@ Virtual DOM · Diff · Patch 와 함수형 Component · Hooks(`useState` / `useE
 
 - 데모: https://cc8s.github.io/jungle-team11-mini-react/ (준비 중)
 
-## 실행 방법
-
-```bash
-npm install
-npm run dev     # 개발 서버
-npm test        # 단위 테스트
-```
-
-> **왜 Vite?** 개발 서버와 번들링만 맡기는 개발 도구다. 런타임 의존성은 0개이고, 화면을 그리는 코드는 전부 직접 작성했다.
-
 ## 아키텍처
 
 <!-- 흐름도: DOM → VNode → diff → patch → 실제 DOM / setState → update() → 새 VNode → diff → patch -->
