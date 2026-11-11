@@ -1,20 +1,105 @@
 <!doctype html>
 <html lang="ko">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mini React — Team 11</title>
-    <link rel="stylesheet" href="/src/styles.css" />
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Equalize · Virtual DOM 검증기</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+    <link rel="stylesheet" href="style.css">
   </head>
   <body>
-    <header>
-      <h1>Mini React</h1>
-      <nav>
-        <button type="button" data-tab="phase1">Phase 1 · Virtual DOM</button>
-        <button type="button" data-tab="app">Phase 2 · Hooks 데모</button>
-      </nav>
-    </header>
-    <main id="root"></main>
-    <script type="module" src="/src/main.js"></script>
+    <div id="app_shell" class="app_shell" data-sidebar_state="expanded">
+      <header class="top_bar">
+        <p class="top_bar_title">
+          <span id="page_title">Phase 1 · Virtual DOM · Diff · Patch</span>
+          <span id="page_meta" class="top_bar_meta"></span>
+        </p>
+      </header>
+
+      <aside id="page_sidebar" class="page_sidebar" aria-label="페이지 선택">
+        <!-- 펼치면 Pages와 접기 버튼을 양끝에, 접으면 접기 버튼만 1번 위에 둔다 -->
+        <div class="sidebar_header">
+          <h2 class="sidebar_label">Pages</h2>
+          <button type="button" id="sidebar_toggle_button" class="icon_button" aria-controls="page_sidebar" aria-expanded="true" aria-label="사이드바 접기" title="사이드바 접기">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M7.5 3.5v13"/></svg>
+          </button>
+        </div>
+        <nav class="nav_list">
+          <a class="nav_item" href="#phase1" data-page_name="phase1" title="Phase 1 · Virtual DOM">
+            <span class="nav_number" aria-hidden="true">1</span>
+            <span class="nav_text">Phase 1 · Virtual DOM</span>
+          </a>
+          <a class="nav_item" href="#phase2" data-page_name="phase2" title="Phase 2 · Component">
+            <span class="nav_number" aria-hidden="true">2</span>
+            <span class="nav_text">Phase 2 · Component</span>
+          </a>
+        </nav>
+      </aside>
+
+      <main class="page_main">
+        <section id="phase1_page" class="page_view page_view_fill" data-page_name="phase1" aria-label="Phase 1">
+          <div class="area_grid">
+            <section class="content_card">
+              <header class="card_header">
+                <h2 class="card_title">실제 영역</h2>
+              </header>
+              <!-- 실제 영역의 내용이 테스트 영역에 그대로 보이므로 들여쓰기를 0부터 시작한다 -->
+              <div id="real_area" class="real_area"><section id="profile_card">
+  <h2>오늘의 할 일</h2>
+  <p class="card_description">이 문단의 글자를 바꾸면 TEXT 연산 하나만 생깁니다.</p>
+  <ul id="todo_list">
+    <li id="todo_shopping">장보기</li>
+    <li id="todo_exercise">운동하기</li>
+    <li id="todo_reading">책 읽기</li>
+  </ul>
+  <!-- id가 있는 li는 key로 비교하므로 순서를 바꾸면 MOVE가 됩니다 -->
+  <label>메모 <input id="memo_input" placeholder="입력값이 patch 후에도 남는지 확인"></label>
+  <p>id 없는 문단은 위치로 비교합니다.</p>
+</section></div>
+            </section>
+
+            <section class="content_card">
+              <header class="card_header">
+                <h2 class="card_title"><label for="test_area">테스트 영역</label></h2>
+                <div class="area_actions" role="group" aria-label="Patch와 이력 이동">
+                  <button type="button" id="back_button" class="ghost_button" title="이전 상태로 이동">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12 5l-5 5 5 5"/></svg><span class="button_text">뒤로가기</span>
+                  </button>
+                  <button type="button" id="forward_button" class="ghost_button" title="다음 상태로 이동">
+                    <span class="button_text">앞으로가기</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 5l5 5-5 5"/></svg>
+                  </button>
+                  <button type="button" id="patch_button" class="primary_button" title="Patch (Ctrl/⌘ + Enter)">Patch</button>
+                </div>
+              </header>
+              <textarea id="test_area" class="test_area" spellcheck="false" autocomplete="off"></textarea>
+            </section>
+          </div>
+        </section>
+
+        <section id="phase2_page" class="page_view" data-page_name="phase2" aria-label="Phase 2" hidden>
+          <!-- FunctionComponent(song_board_root)가 이 안을 그린다. State가 바뀌면 diff → patch로 바뀐 부분만 고친다 -->
+          <div id="song_board" class="area_grid song_board"></div>
+        </section>
+      </main>
+
+      <aside class="history_panel" aria-label="State History">
+        <header class="history_header">
+          <h2 class="history_title">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2"/></svg>
+            State History
+          </h2>
+          <span class="history_header_side">
+            <span id="history_count" class="history_count"></span>
+            <button type="button" id="highlight_toggle_button" class="icon_button history_toggle" aria-pressed="true" aria-label="변경 하이라이트 끄기" title="변경 하이라이트 끄기" data-page_scope="phase2" hidden>
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 10s3-5.5 8-5.5S18 10 18 10s-3 5.5-8 5.5S2 10 2 10z"/><circle cx="10" cy="10" r="2.5"/></svg>
+            </button>
+          </span>
+        </header>
+        <ol id="history_list" class="history_list" data-page_scope="phase1"></ol>
+        <ol id="render_history_list" class="history_list" data-page_scope="phase2" hidden></ol>
+      </aside>
+    </div>
+
+    <script type="module" src="src/app.js"></script>
   </body>
 </html>
