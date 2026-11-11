@@ -128,6 +128,17 @@ export function is_same_tree(first_node, second_node) {
   return first_node.children.every((child_node, index) => is_same_tree(child_node, second_node.children[index]));
 }
 
+// DOM 표준의 "valid attribute local name": 비어 있지 않고 ASCII 공백, NULL, /, =, >를 포함하지 않는다.
+// HTML 파서는 이름을 검사하지 않아 <p =x>에서 이름이 "=x"인 attribute를 만들지만,
+// setAttribute("=x")는 InvalidCharacterError를 던져 patch가 중간에 멈춘다.
+const invalid_attribute_name_pattern = /[\t\n\f\r \u0000/=>]/;
+
+export function is_valid_attribute_name(attribute_name) {
+  return (
+    typeof attribute_name === 'string' && attribute_name !== '' && !invalid_attribute_name_pattern.test(attribute_name)
+  );
+}
+
 export function is_safe_attribute(attribute_name, attribute_value) {
   if (typeof attribute_name !== 'string' || attribute_name === '') return false;
   const lowered_name = attribute_name.toLowerCase();
@@ -179,7 +190,11 @@ export function create_virtual_node_from_dom(dom_node) {
       if (is_blocked_element_name(dom_node.localName)) return null;
       const safe_attributes = Object.create(null);
       for (const attribute_node of Array.from(dom_node.attributes)) {
-        if (is_safe_attribute(attribute_node.name, attribute_node.value)) {
+        // 파서는 받아도 setAttribute가 거부하는 이름(<p =x>의 "=x")은 실제 영역에 만들 수 없으므로 뺀다.
+        if (
+          is_valid_attribute_name(attribute_node.name) &&
+          is_safe_attribute(attribute_node.name, attribute_node.value)
+        ) {
           safe_attributes[attribute_node.name] = attribute_node.value;
         }
       }

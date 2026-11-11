@@ -235,7 +235,9 @@ class fake_character_data extends fake_node {
 }
 
 const form_control_names = new Set(['input', 'textarea', 'select', 'button']);
-const valid_attribute_name_pattern = /^[^\s"'>/=\u0000]+$/;
+// DOM 표준 "valid attribute local name": ASCII 공백(탭, LF, FF, CR, 스페이스), NULL, /, =, >만 거부한다.
+// 따옴표나 U+00A0 같은 비 ASCII 공백은 허용한다(2026-11-11 Chrome 156에서 setAttribute('"a') 성공 확인).
+const valid_attribute_name_pattern = /^[^\t\n\f\r \u0000/=>]+$/;
 
 class fake_element extends fake_node {
   constructor(owner_document, namespace_uri, qualified_name) {
@@ -425,4 +427,16 @@ export function build_element(owner_document, element_name, attributes = {}, chi
     element_node.appendChild(typeof child_node === 'string' ? owner_document.createTextNode(child_node) : child_node);
   }
   return element_node;
+}
+
+// HTML 파서가 만든 attribute를 흉내 낸다. 파서(tokenizer)는 이름을 검사하지 않으므로
+// <p =x>에서 이름이 "=x"인 attribute를 만들지만, 같은 이름을 setAttribute에 넘기면 InvalidCharacterError가 난다.
+export function append_parsed_attribute(element_node, attribute_name, attribute_value) {
+  element_node.attributes.push({
+    name: attribute_name,
+    prefix: null,
+    localName: attribute_name,
+    namespaceURI: null,
+    value: String(attribute_value),
+  });
 }

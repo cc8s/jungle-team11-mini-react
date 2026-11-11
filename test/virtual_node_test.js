@@ -10,11 +10,19 @@ import {
   is_same_tree,
   is_safe_attribute,
   is_url_animation_element,
+  is_valid_attribute_name,
   text_node_type,
   comment_node_type,
   fragment_node_type,
 } from '../src/virtual_node.js';
-import { fake_document, build_element, svg_namespace_uri, html_namespace_uri } from './support/fake_dom.js';
+import { create_bookmark_registry, create_dom_tree } from '../src/patch.js';
+import {
+  fake_document,
+  build_element,
+  append_parsed_attribute,
+  svg_namespace_uri,
+  html_namespace_uri,
+} from './support/fake_dom.js';
 
 test('EC-001 잘못된 element_type이면 TypeError', () => {
   for (const invalid_type of [null, undefined, '', 42, '#text']) {
@@ -274,4 +282,25 @@ test('EC-020 URL attribute를 바꾸는 SVG animate와 set 요소는 변환에�
   assert.equal(is_url_animation_element('animate', { attributeName: 'fill' }), false);
   assert.equal(is_url_animation_element('rect', { attributeName: 'href' }), false);
   assert.equal(is_url_animation_element('set', {}), false);
+});
+
+test('EC-021 HTML 파서가 만든 잘못된 attribute 이름(<p =x>)은 변환에서 빼서 patch가 InvalidCharacterError를 내지 않는다', () => {
+  const owner_document = new fake_document();
+  const paragraph_element = build_element(owner_document, 'p', { class: 'note' }, ['본문']);
+  append_parsed_attribute(paragraph_element, '=x', '');
+  append_parsed_attribute(paragraph_element, '==', 'y');
+  const paragraph_node = create_virtual_node_from_dom(paragraph_element);
+  assert.deepEqual(Object.keys(paragraph_node.attributes), ['class']);
+  const created_element = create_dom_tree(create_bookmark_registry(), paragraph_node, owner_document);
+  assert.equal(created_element.getAttribute('class'), 'note');
+  assert.equal(created_element.textContent, '본문');
+});
+
+test('EC-021 is_valid_attribute_name은 DOM 표준대로 빈 이름과 ASCII 공백, NULL, /, =, >가 든 이름만 거부한다', () => {
+  for (const valid_name of ['class', 'data-x', 'aria-label', 'viewBox', 'xlink:href', '"a', '@click', '1a', '한글']) {
+    assert.equal(is_valid_attribute_name(valid_name), true, valid_name);
+  }
+  for (const invalid_name of ['', '=x', 'a=b', 'a b', 'a\tb', 'a\nb', 'a/b', 'a>b', 'a\u0000b', null, undefined, 42]) {
+    assert.equal(is_valid_attribute_name(invalid_name), false, String(invalid_name));
+  }
 });

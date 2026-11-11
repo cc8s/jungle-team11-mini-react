@@ -39,6 +39,7 @@
 | EC-018 | 변환 중 live `childNodes`가 바뀜 | 먼저 `Array.from`으로 복사하고 순회해 시작 시점의 자식을 모두 변환 | EC-018 변환 중 live childNodes가 바뀌어도 시작 시점의 자식을 모두 변환한다 | 통과 |
 | EC-019 | 깊은 중첩 | 3000단계까지 `RangeError` 없이 변환. 재귀 구현이라 한계가 있으며 실측값은 Node 26 약 5000단계, Chrome 156 6000~8000단계 사이(2026-11-11). 브라우저 HTML 파서가 중첩을 512단계로 자르므로(Chrome에서 2000단계 입력 → 512단계 확인) 테스트 영역 입력으로는 한계에 닿지 않음 | EC-019 HTML 파서 중첩 제한(512단계)보다 충분히 깊은 3000단계도 RangeError 없이 변환한다 | 통과 |
 | EC-020 | SVG `animate`·`set`의 `attributeName`이 URL attribute(`href`, `xlink:href` 등, 대소문자·공백 포함) | 요소째 변환에서 제외. `values`/`to` 값으로 href를 `javascript:` URL로 바꿀 수 있기 때문 (값이 안전해도 제외). 다른 attribute를 바꾸는 애니메이션은 유지 | EC-020 URL attribute를 바꾸는 SVG animate와 set 요소는 변환에서 제외하고 다른 애니메이션은 남긴다 | 통과 |
+| EC-021 | HTML 파서가 만든, `setAttribute`가 거부하는 attribute 이름 (`<p =x>`의 `=x`, `==`) | 변환에서 그 attribute만 뺌. 그대로 두면 patch의 `setAttribute`가 `InvalidCharacterError`를 던져 실제 영역이 비고 이후 Patch도 반영되지 않았음. 판별은 DOM 표준 "valid attribute local name"(빈 이름, ASCII 공백, NULL, `/`, `=`, `>` 거부)을 따르는 `is_valid_attribute_name` | EC-021 HTML 파서가 만든 잘못된 attribute 이름(<p =x>)은 변환에서 빼서 patch가 InvalidCharacterError를 내지 않는다, EC-021 is_valid_attribute_name은 DOM 표준대로 빈 이름과 ASCII 공백, NULL, /, =, >가 든 이름만 거부한다 | 통과 |
 
 ## 유닛 테스트
 
@@ -64,6 +65,8 @@
 | EC-018 변환 중 live childNodes가 바뀌어도 시작 시점의 자식을 모두 변환한다 | 순회 중 live 컬렉션 변경 (`Array.from`을 빼면 실패함을 확인) | EC-018 |
 | EC-019 HTML 파서 중첩 제한(512단계)보다 충분히 깊은 3000단계도 RangeError 없이 변환한다 | 깊은 중첩 여유 | EC-019 |
 | EC-020 URL attribute를 바꾸는 SVG animate와 set 요소는 변환에서 제외하고 다른 애니메이션은 남긴다 | 애니메이션을 통한 XSS 차단 | EC-020 |
+| EC-021 HTML 파서가 만든 잘못된 attribute 이름(<p =x>)은 변환에서 빼서 patch가 InvalidCharacterError를 내지 않는다 | 파서가 만든 `=x` 이름 제외, 변환 결과로 `create_dom_tree`가 예외 없이 동작 | EC-021 |
+| EC-021 is_valid_attribute_name은 DOM 표준대로 빈 이름과 ASCII 공백, NULL, /, =, >가 든 이름만 거부한다 | 이름 판별 순수 함수 (따옴표, `@`, 숫자 시작, 한글은 허용) | EC-021 |
 
 ## 미검증 항목
 
@@ -76,3 +79,4 @@
 | Shadow DOM | `childNodes`는 shadow root를 포함하지 않음 | 확인함. open shadow root가 붙은 요소는 light DOM 자식(`span`)만 변환되고 shadow 트리(`i`)는 빠짐 (의도된 동작) / **Playwright MCP 2차 검증 (2026-11-11, Chromium 157)**: light DOM `span`만 변환, shadow 안 `i`는 빠짐 |
 | 네임스페이스가 있는 attribute (`xlink:href`) | 이름 문자열로만 저장함 | 해결함. 변환은 이름만 저장하고, patch가 `attribute_namespace.js`의 표로 `setAttributeNS`를 써서 파서와 같은 attribute를 만든다. 2026-11-11 Chrome에서 `<use xlink:href>`의 `getBBox` 20×30 확인 (수정 전 0×0) / **Playwright MCP 2차 검증 (2026-11-11, Chromium 157)**: `<use xlink:href>` mount·ATTRIBUTES 모두 `getBBox` 20×30 |
 | SVG 애니메이션을 통한 `javascript:` URL | 대역은 SMIL 애니메이션을 실행하지 않음 | 2026-11-11 Chrome에서 확인: 수정 전 `<animate attributeName="href" values="javascript:...">`가 필터를 통과해 링크의 `href.animVal`이 `javascript:` URL이 됨. 수정 후 `animate`·`set`(href 대상)은 빠지고 `opacity` 애니메이션만 남으며 `animVal`은 빈 값 / **Playwright MCP 2차 검증 (2026-11-11, Chromium 157)**: href 대상 `animate`·`set`은 빠지고 `opacity` 애니메이션만 남음, 링크 `href.animVal`은 원래 값 `#ok` |
+| 파서는 받지만 `setAttribute`가 거부하는 attribute 이름 (EC-021) | 대역에는 HTML 파서가 없어 `append_parsed_attribute`로 파서 결과를 흉내 냄 | 2026-11-11 Chrome 156(앱 내장 브라우저)에서 확인: `<p =x "a 'b @click 1a [x] a<b ·c 한글 x:y>`를 `<template>`로 파싱하면 이름 10개가 생기고 `setAttribute`는 `=x`만 거부함(표준 규칙과 일치). 수정 후 Phase 1 테스트 영역에 `<p =x id="bad_attr">`를 넣어 Patch하면 `id`만 붙은 `p`가 반영되고, 다음 Patch도 정상 반영됨. 페이지 오류·콘솔 오류 0개 |
