@@ -449,3 +449,88 @@ test('EC-017 필터를 바꿔도 수정 중인 곡이 계속 보이면 수정 �
   assert.equal(find_element(container_element, has_id('edit_song_1_title')) === title_input, true, '같은 input DOM이어야 한다');
   assert.equal(title_input.value, '바꾸는 중');
 });
+
+// 현재 렌더링 트리에서 곡 행(li)의 Virtual DOM 노드를 key로 찾는다.
+function find_row_virtual_node(component, song_id) {
+  const pending_nodes = [component.current_root];
+  while (pending_nodes.length > 0) {
+    const current_node = pending_nodes.pop();
+    if (current_node.key === `row_${song_id}`) return current_node;
+    if (current_node.children) pending_nodes.push(...current_node.children);
+  }
+  return null;
+}
+
+function collect_subtree_nodes(virtual_node) {
+  const subtree_nodes = new Set();
+  const pending_nodes = [virtual_node];
+  while (pending_nodes.length > 0) {
+    const current_node = pending_nodes.pop();
+    subtree_nodes.add(current_node);
+    if (current_node.children) pending_nodes.push(...current_node.children);
+  }
+  return subtree_nodes;
+}
+
+test('EC-021 즐겨찾기 토글 뒤 바뀌지 않은 행은 이전 Virtual DOM 객체를 그대로 쓰고, 그 행에는 BIND가 생기지 않는다', async () => {
+  const board = mount_board();
+  const { container_element, component } = board;
+  const first_row_before = find_row_virtual_node(component, 'song_1');
+  const toggled_row_before = find_row_virtual_node(component, 'song_2');
+  const third_row_before = find_row_virtual_node(component, 'song_3');
+  click(find_row_button(find_row(container_element, 'song_2'), '즐겨찾기'));
+  await wait_for_scheduled_update();
+  assert.equal(find_row_virtual_node(component, 'song_1'), first_row_before, '바뀌지 않은 행은 같은 객체');
+  assert.equal(find_row_virtual_node(component, 'song_3'), third_row_before, '바뀌지 않은 행은 같은 객체');
+  assert.notEqual(find_row_virtual_node(component, 'song_2'), toggled_row_before, '바뀐 행은 새 객체');
+  const bound_nodes = board
+    .latest_operations()
+    .filter((operation) => operation.kind === operation_kinds.bind)
+    .map((operation) => operation.new_node);
+  const unchanged_row_nodes = new Set([...collect_subtree_nodes(first_row_before), ...collect_subtree_nodes(third_row_before)]);
+  assert.equal(bound_nodes.filter((bound_node) => unchanged_row_nodes.has(bound_node)).length, 0);
+});
+
+test('EC-022 재사용한 행의 버튼도 최신 State로 계산한다 (즐겨찾기, 이동, 삭제를 이어서 해도 앞의 변경이 사라지지 않음)', async () => {
+  const board = mount_board();
+  const { container_element } = board;
+  const read_saved_board = () => board.saved_boards[board.saved_boards.length - 1];
+  const read_favorite_ids = () => read_saved_board().songs.filter((song) => song.is_favorite).map((song) => song.id);
+
+  click(find_row_button(find_row(container_element, 'song_2'), '즐겨찾기'));
+  await wait_for_scheduled_update();
+  // song_3 행은 위 렌더링에서 재사용됐다. 그 행의 핸들러가 지난 songs로 계산하면 song_2의 즐겨찾기가 되돌아간다.
+  click(find_row_button(find_row(container_element, 'song_3'), '즐겨찾기 해제'));
+  await wait_for_scheduled_update();
+  assert.deepEqual(read_favorite_ids(), ['song_1', 'song_2']);
+
+  click(find_row_button(find_row(container_element, 'song_1'), '아래로'));
+  await wait_for_scheduled_update();
+  assert.deepEqual(list_row_ids(container_element), ['row_song_2', 'row_song_1', 'row_song_3']);
+  assert.deepEqual(read_favorite_ids(), ['song_2', 'song_1']);
+
+  click(find_row_button(find_row(container_element, 'song_3'), '삭제'));
+  await wait_for_scheduled_update();
+  assert.deepEqual(list_row_ids(container_element), ['row_song_2', 'row_song_1']);
+  assert.deepEqual(read_favorite_ids(), ['song_2', 'song_1']);
+  assert.equal(read_saved_board().main_song_id, 'song_1');
+});
+
+test('EC-023 재사용한 행에서 메인곡을 지정·삭제해도 최신 메인곡 기준으로 처리한다', async () => {
+  const board = mount_board();
+  const { container_element } = board;
+  const read_saved_board = () => board.saved_boards[board.saved_boards.length - 1];
+
+  click(find_main_button(find_row(container_element, 'song_2')));
+  await wait_for_scheduled_update();
+  assert.equal(read_saved_board().main_song_id, 'song_2');
+  // song_3 행은 위 렌더링에서 재사용됐다. 지난 main_song_id(song_1)로 비교하면 메인곡이 아닌 곡 삭제에도 메인곡을 지운다.
+  click(find_row_button(find_row(container_element, 'song_3'), '삭제'));
+  await wait_for_scheduled_update();
+  assert.equal(read_saved_board().main_song_id, 'song_2');
+
+  click(find_row_button(find_row(container_element, 'song_2'), '삭제'));
+  await wait_for_scheduled_update();
+  assert.equal(read_saved_board().main_song_id, null);
+  assert.equal(find_element(container_element, has_class('main_song_empty')) !== null, true);
+});
