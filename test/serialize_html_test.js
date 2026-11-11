@@ -68,3 +68,34 @@ test('EC-007 SVG 요소는 이름이 HTML void 요소와 같아도 닫는 태그
 test('EC-008 빈 루트는 빈 문자열이다', () => {
   assert.equal(serialize_to_html(fragment_node()), '');
 });
+
+test('EC-009 pre, textarea, listing의 텍스트가 줄바꿈으로 시작하면 파서가 버릴 줄바꿈을 하나 더 쓴다', () => {
+  for (const element_name of ['pre', 'textarea', 'listing']) {
+    const block_node = element_node(element_name, null, [text_node('\n둘째 줄')]);
+    assert.equal(serialize_to_html(block_node), `<${element_name}>\n\n둘째 줄</${element_name}>`);
+  }
+  assert.equal(serialize_to_html(element_node('pre', null, [text_node('첫 줄\n')])), '<pre>첫 줄\n</pre>');
+  assert.equal(serialize_to_html(element_node('pre', null, [element_node('b', null, [text_node('\n')])])), '<pre><b>\n</b></pre>');
+  assert.equal(
+    serialize_to_html(element_node('pre', null, [text_node('\n')], svg_namespace_uri)),
+    '<pre>\n</pre>',
+    'SVG 등 HTML이 아닌 요소에는 줄바꿈 규칙이 없다',
+  );
+});
+
+test('EC-010 noscript 안의 텍스트는 이스케이프한다 (inert 파싱은 script가 꺼져 있어 일반 요소로 읽는다)', () => {
+  const noscript_node = element_node('noscript', null, [text_node('<img src=x onerror=alert(1)>')]);
+  assert.equal(serialize_to_html(noscript_node), '<noscript>&lt;img src=x onerror=alert(1)&gt;</noscript>');
+});
+
+test('EC-011 plaintext 요소는 문서 끝까지 이어지므로 자신과 조상의 닫는 태그를 쓰지 않는다', () => {
+  const plaintext_tree = fragment_node([
+    element_node('div', null, [text_node('앞'), element_node('plaintext', null, [text_node('abc</plaintext><p>뒤</p>')])]),
+  ]);
+  assert.equal(serialize_to_html(plaintext_tree), '<div>앞<plaintext>abc</plaintext><p>뒤</p>');
+  assert.equal(
+    serialize_to_html(element_node('p', null, [text_node('a')])),
+    '<p>a</p>',
+    'plaintext를 쓴 뒤의 상태가 다음 호출에 남지 않는다',
+  );
+});
