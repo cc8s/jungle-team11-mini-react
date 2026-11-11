@@ -19,7 +19,14 @@ import {
   create_dom_tree,
   unmount_tree,
 } from '../src/patch.js';
-import { fake_document, svg_namespace_uri } from './support/fake_dom.js';
+import {
+  fake_document,
+  build_element,
+  svg_namespace_uri,
+  xlink_namespace_uri,
+  xml_namespace_uri,
+  xmlns_namespace_uri,
+} from './support/fake_dom.js';
 
 function create_environment(initial_tree) {
   const owner_document = new fake_document();
@@ -321,4 +328,77 @@ test('EC-020 unmount_tree 반복 호출(중복 해제)은 안전하고, 컨테�
   assert.doesNotThrow(() => unmount_tree(environment.bookmark_registry, environment.container_element));
   assert.throws(() => unmount_tree(environment.bookmark_registry, null), TypeError);
   assert.throws(() => unmount_tree(environment.bookmark_registry, {}), TypeError);
+});
+
+function find_attribute_node(dom_element, attribute_name) {
+  return dom_element.attributes.find((attribute_node) => attribute_node.name === attribute_name);
+}
+
+test('EC-021 SVG 요소를 만들 때 xlink:href는 xlink 네임스페이스 attribute가 되고 HTML 요소에서는 일반 attribute다', () => {
+  const owner_document = new fake_document();
+  const bookmark_registry = create_bookmark_registry();
+  const use_dom_node = create_dom_tree(
+    bookmark_registry,
+    element_node('use', { 'xlink:href': '#shape', href: '#shape' }, [], svg_namespace_uri),
+    owner_document,
+  );
+  const xlink_attribute = find_attribute_node(use_dom_node, 'xlink:href');
+  assert.equal(xlink_attribute.namespaceURI, xlink_namespace_uri);
+  assert.equal(xlink_attribute.prefix, 'xlink');
+  assert.equal(xlink_attribute.localName, 'href');
+  assert.equal(use_dom_node.getAttributeNS(xlink_namespace_uri, 'href'), '#shape');
+  assert.equal(find_attribute_node(use_dom_node, 'href').namespaceURI, null);
+
+  const division_dom_node = create_dom_tree(bookmark_registry, element_node('div', { 'xlink:href': '#x' }), owner_document);
+  assert.equal(find_attribute_node(division_dom_node, 'xlink:href').namespaceURI, null);
+});
+
+test('EC-022 ATTRIBUTES 연산은 xlink:href를 네임스페이스와 함께 추가하고, 값 변경과 제거도 같은 attribute 하나에 적용한다', () => {
+  const first_tree = fragment_node([element_node('svg', null, [element_node('use', { id: 'icon' }, [], svg_namespace_uri)], svg_namespace_uri)]);
+  const second_tree = fragment_node([
+    element_node('svg', null, [element_node('use', { id: 'icon', 'xlink:href': '#a' }, [], svg_namespace_uri)], svg_namespace_uri),
+  ]);
+  const third_tree = fragment_node([
+    element_node('svg', null, [element_node('use', { id: 'icon', 'xlink:href': '#b' }, [], svg_namespace_uri)], svg_namespace_uri),
+  ]);
+  const environment = create_environment(first_tree);
+  const use_dom_node = environment.container_element.childNodes[0].childNodes[0];
+
+  patch_to(environment, first_tree, second_tree);
+  assert.equal(use_dom_node.getAttributeNS(xlink_namespace_uri, 'href'), '#a');
+
+  patch_to(environment, second_tree, third_tree);
+  assert.equal(use_dom_node.getAttributeNS(xlink_namespace_uri, 'href'), '#b');
+  assert.equal(use_dom_node.attributes.filter((attribute_node) => attribute_node.localName === 'href').length, 1);
+
+  patch_to(environment, third_tree, first_tree);
+  assert.equal(use_dom_node.getAttributeNS(xlink_namespace_uri, 'href'), null);
+  assert.deepEqual(use_dom_node.attributes.map((attribute_node) => attribute_node.name), ['id']);
+});
+
+test('EC-023 왕복: 파서처럼 네임스페이스를 붙인 DOM → Virtual DOM → patch로 만든 DOM의 attribute가 같다', () => {
+  const owner_document = new fake_document();
+  const source_svg = owner_document.createElementNS(svg_namespace_uri, 'svg');
+  source_svg.setAttributeNS(xmlns_namespace_uri, 'xmlns:xlink', xlink_namespace_uri);
+  source_svg.setAttribute('viewBox', '0 0 10 10');
+  const source_use = owner_document.createElementNS(svg_namespace_uri, 'use');
+  source_use.setAttributeNS(xlink_namespace_uri, 'xlink:href', '#shape');
+  source_use.setAttributeNS(xml_namespace_uri, 'xml:lang', 'ko');
+  source_use.setAttribute('href', '#shape');
+  source_svg.appendChild(source_use);
+  const source_container = owner_document.createElement('div');
+  source_container.appendChild(source_svg);
+  source_container.appendChild(build_element(owner_document, 'p', { 'xlink:href': '#plain', class: 'note' }));
+
+  const environment = create_environment(create_root_from_container(source_container));
+  const describe_attributes = (dom_element) =>
+    dom_element.attributes
+      .map((attribute_node) => [attribute_node.namespaceURI, attribute_node.prefix, attribute_node.localName, attribute_node.value])
+      .sort((first, second) => String(first).localeCompare(String(second)));
+  const source_elements = [source_svg, source_use, source_container.childNodes[1]];
+  const patched_svg = environment.container_element.childNodes[0];
+  const patched_elements = [patched_svg, patched_svg.childNodes[0], environment.container_element.childNodes[1]];
+  source_elements.forEach((source_element, index) => {
+    assert.deepEqual(describe_attributes(patched_elements[index]), describe_attributes(source_element));
+  });
 });

@@ -74,5 +74,5 @@
 | 실제 브라우저 DOM의 `attributes`(NamedNodeMap), `localName`, `namespaceURI` 값 | 테스트 대역은 표준을 흉내 낼 뿐 실제 구현이 아님 | 확인함. `innerHTML`로 만든 `<svg viewBox>` → `type: svg`, SVG 네임스페이스, `viewBox` 대소문자 유지, 자식 `linearGradient` 유지. `<p onclick class>`는 `class`만 남음 |
 | `iframe` 안 문서의 노드 변환 | 대역에 다른 문서(realm)를 만들지 않음 | 확인함. 같은 출처 iframe의 `contentDocument`에서 만든 요소(바깥 `HTMLElement`의 인스턴스가 아님)도 type, key, 텍스트, SVG 네임스페이스가 정상 변환됨. `nodeType` 숫자로 판별하므로 realm과 무관 |
 | Shadow DOM | `childNodes`는 shadow root를 포함하지 않음 | 확인함. open shadow root가 붙은 요소는 light DOM 자식(`span`)만 변환되고 shadow 트리(`i`)는 빠짐 (의도된 동작) |
-| 네임스페이스가 있는 attribute (`xlink:href`) | 이름 문자열로만 저장하고 `setAttribute`로 다시 만듦 | **문제 확인.** 변환 결과에는 `xlink:href`가 남지만, `setAttribute('xlink:href', ...)`로 다시 만들면 네임스페이스가 `null`인 일반 attribute가 되어 `<use>`가 대상을 참조하지 못함(`getBBox` 20×30 → 0×0). `href`를 함께 쓰거나 `href`만 쓰면 영향 없음. 수정 전까지 알려진 한계 |
+| 네임스페이스가 있는 attribute (`xlink:href`) | 이름 문자열로만 저장함 | 해결함. 변환은 이름만 저장하고, patch가 `attribute_namespace.js`의 표로 `setAttributeNS`를 써서 파서와 같은 attribute를 만든다. 2026-11-11 Chrome에서 `<use xlink:href>`의 `getBBox` 20×30 확인 (수정 전 0×0) |
 | SVG 애니메이션을 통한 `javascript:` URL | 대역은 SMIL 애니메이션을 실행하지 않음 | 2026-11-11 Chrome에서 확인: 수정 전 `<animate attributeName="href" values="javascript:...">`가 필터를 통과해 링크의 `href.animVal`이 `javascript:` URL이 됨. 수정 후 `animate`·`set`(href 대상)은 빠지고 `opacity` 애니메이션만 남으며 `animVal`은 빈 값 |

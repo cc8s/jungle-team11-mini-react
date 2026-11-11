@@ -5,6 +5,9 @@
 
 export const html_namespace_uri = 'http://www.w3.org/1999/xhtml';
 export const svg_namespace_uri = 'http://www.w3.org/2000/svg';
+export const xlink_namespace_uri = 'http://www.w3.org/1999/xlink';
+export const xml_namespace_uri = 'http://www.w3.org/XML/1998/namespace';
+export const xmlns_namespace_uri = 'http://www.w3.org/2000/xmlns/';
 
 function create_dom_exception(exception_name, message_text) {
   const dom_exception = new Error(message_text);
@@ -271,7 +274,59 @@ class fake_element extends fake_node {
     const normalized_name = this.normalize_attribute_name(attribute_name);
     const existing_attribute = this.attributes.find((attribute_node) => attribute_node.name === normalized_name);
     if (existing_attribute) existing_attribute.value = String(attribute_value);
-    else this.attributes.push({ name: normalized_name, localName: normalized_name, namespaceURI: null, value: String(attribute_value) });
+    else {
+      this.attributes.push({
+        name: normalized_name,
+        prefix: null,
+        localName: normalized_name,
+        namespaceURI: null,
+        value: String(attribute_value),
+      });
+    }
+  }
+
+  // DOM 표준 "validate and extract": qualified name을 prefix와 localName으로 나누고 네임스페이스 조합을 검사한다.
+  // 같은 (namespaceURI, localName) attribute가 있으면 값만 바꾸고, 없으면 새로 붙인다.
+  setAttributeNS(namespace_uri, qualified_name, attribute_value) {
+    const normalized_namespace = namespace_uri === '' || namespace_uri === undefined ? null : namespace_uri;
+    const qualified_text = String(qualified_name);
+    if (!valid_attribute_name_pattern.test(qualified_text)) {
+      throw create_dom_exception('InvalidCharacterError', `잘못된 attribute 이름: ${qualified_text}`);
+    }
+    const separator_index = qualified_text.indexOf(':');
+    const prefix_text = separator_index === -1 ? null : qualified_text.slice(0, separator_index);
+    const local_name = separator_index === -1 ? qualified_text : qualified_text.slice(separator_index + 1);
+    const is_xmlns_name = qualified_text === 'xmlns' || prefix_text === 'xmlns';
+    if (
+      (prefix_text !== null && normalized_namespace === null) ||
+      (prefix_text === 'xml' && normalized_namespace !== xml_namespace_uri) ||
+      (is_xmlns_name && normalized_namespace !== xmlns_namespace_uri) ||
+      (normalized_namespace === xmlns_namespace_uri && !is_xmlns_name)
+    ) {
+      throw create_dom_exception('NamespaceError', `네임스페이스와 이름이 맞지 않습니다: ${qualified_text}`);
+    }
+    const existing_attribute = this.attributes.find(
+      (attribute_node) => attribute_node.namespaceURI === normalized_namespace && attribute_node.localName === local_name,
+    );
+    if (existing_attribute) existing_attribute.value = String(attribute_value);
+    else {
+      this.attributes.push({
+        name: qualified_text,
+        prefix: prefix_text,
+        localName: local_name,
+        namespaceURI: normalized_namespace,
+        value: String(attribute_value),
+      });
+    }
+  }
+
+  getAttributeNS(namespace_uri, local_name) {
+    const normalized_namespace = namespace_uri === '' || namespace_uri === undefined ? null : namespace_uri;
+    return (
+      this.attributes.find(
+        (attribute_node) => attribute_node.namespaceURI === normalized_namespace && attribute_node.localName === local_name,
+      )?.value ?? null
+    );
   }
 
   removeAttribute(attribute_name) {

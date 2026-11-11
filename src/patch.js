@@ -3,6 +3,7 @@
 
 import { fragment_node_type, text_node_type, comment_node_type, is_virtual_node } from './virtual_node.js';
 import { operation_kinds } from './diff.js';
+import { resolve_attribute_namespace } from './attribute_namespace.js';
 
 export function create_bookmark_registry() {
   return Object.freeze({ dom_nodes_by_virtual_node: new WeakMap() });
@@ -42,6 +43,15 @@ function unbind_subtree(bookmark_registry, dom_node) {
   }
 }
 
+// setAttribute는 항상 네임스페이스 없는 attribute를 만든다. 파서가 네임스페이스를 붙이는 이름이면
+// setAttributeNS로 만들어야 같은 attribute가 된다(예: SVG <use xlink:href>가 대상을 참조함).
+// 이미 있는 attribute는 둘 다 값만 바꾸고, removeAttribute는 qualified name으로 찾으므로 그대로 쓴다.
+function set_dom_attribute(element_dom_node, element_namespace, attribute_name, attribute_value) {
+  const attribute_namespace = resolve_attribute_namespace(element_namespace, attribute_name);
+  if (attribute_namespace === null) element_dom_node.setAttribute(attribute_name, attribute_value);
+  else element_dom_node.setAttributeNS(attribute_namespace, attribute_name, attribute_value);
+}
+
 function require_document(owner_document) {
   if (owner_document === null || owner_document === undefined || typeof owner_document.createElement !== 'function') {
     throw new TypeError('DOM 노드를 만들 document가 필요합니다');
@@ -64,7 +74,7 @@ export function create_dom_tree(bookmark_registry, virtual_node, owner_document)
       ? owner_document.createElementNS(virtual_node.namespace, virtual_node.type)
       : owner_document.createElement(virtual_node.type);
     for (const attribute_name of Object.keys(virtual_node.attributes)) {
-      dom_node.setAttribute(attribute_name, virtual_node.attributes[attribute_name]);
+      set_dom_attribute(dom_node, virtual_node.namespace, attribute_name, virtual_node.attributes[attribute_name]);
     }
     for (const child_node of virtual_node.children) {
       dom_node.appendChild(create_dom_tree(bookmark_registry, child_node, owner_document));
@@ -147,7 +157,12 @@ export function apply_operations(bookmark_registry, operations, owner_document) 
           element_dom_node.removeAttribute(attribute_name);
         }
         for (const attribute_name of Object.keys(operation.changed_attributes)) {
-          element_dom_node.setAttribute(attribute_name, operation.changed_attributes[attribute_name]);
+          set_dom_attribute(
+            element_dom_node,
+            operation.new_node.namespace,
+            attribute_name,
+            operation.changed_attributes[attribute_name],
+          );
         }
         record_change(operation, element_dom_node);
         break;

@@ -11,6 +11,7 @@
 - `unmount_tree`는 `mount_tree`로 그린 내용을 지우고 컨테이너를 포함한 양쪽 북마크를 해제한다. `FunctionComponent.unmount()`가 쓴다.
 - `REMOVE`와 `REPLACE`가 떼어 낼 DOM은 적용 전에 모두 찾아 둔다. 북마크가 빠진 연산이 있으면 DOM을 바꾸기 전에 오류를 낸다.
 - 제거된 하위 트리는 DOM 쪽 북마크를 따라 해제한다. 같은 Virtual DOM 객체가 그사이 다른 DOM에 다시 연결됐다면 그 연결은 지우지 않는다.
+- attribute는 `set_dom_attribute`로 넣는다. HTML 파서가 네임스페이스를 붙이는 이름(`xlink:href` 등, `attribute_namespace.md` 참고)이 SVG·MathML 요소에 오면 `setAttributeNS`를 쓴다. 이미 있는 attribute의 값 변경과 `removeAttribute`는 qualified name으로 찾으므로 네임스페이스가 유지된다.
 - 바뀌지 않은 DOM 노드는 그대로 두므로 `input`의 property 값, 포커스, 선택 영역이 유지된다.
 
 ## 엣지 케이스
@@ -35,6 +36,9 @@
 | EC-015 | 1000단계 중첩 | mount와 patch 성공 | EC-015 깊은 중첩(1000단계, 브라우저 파서 한도 512의 두 배)도 mount와 patch가 된다 | 통과 |
 | EC-019 | `unmount_tree` | 내용을 지우고 컨테이너를 포함한 양쪽 북마크 해제 | EC-019 unmount_tree는 내용을 지우고 컨테이너를 포함한 양쪽 북마크를 해제한다 | 통과 |
 | EC-020 | `unmount_tree` 반복 호출(중복 해제), 컨테이너가 `null`·일반 객체 | 반복은 안전, 컨테이너가 아니면 `TypeError` | EC-020 unmount_tree 반복 호출(중복 해제)은 안전하고, 컨테이너가 없으면 TypeError | 통과 |
+| EC-021 | SVG 요소를 만들 때 `xlink:href`, HTML 요소의 `xlink:href` | SVG는 xlink 네임스페이스(prefix `xlink`, localName `href`), HTML은 네임스페이스 없음 | EC-021 SVG 요소를 만들 때 xlink:href는 xlink 네임스페이스 attribute가 되고 HTML 요소에서는 일반 attribute다 | 통과 |
+| EC-022 | `ATTRIBUTES` 연산으로 `xlink:href` 추가, 값 변경, 제거 | 네임스페이스와 함께 추가, 변경해도 attribute는 하나, 제거 후 남지 않음 | EC-022 ATTRIBUTES 연산은 xlink:href를 네임스페이스와 함께 추가하고, 값 변경과 제거도 같은 attribute 하나에 적용한다 | 통과 |
+| EC-023 | 파서처럼 네임스페이스가 붙은 DOM → Virtual DOM → patch 왕복 | attribute의 네임스페이스, prefix, localName, 값이 원래 DOM과 같음 | EC-023 왕복: 파서처럼 네임스페이스를 붙인 DOM → Virtual DOM → patch로 만든 DOM의 attribute가 같다 | 통과 |
 | EC-016 | 이미 문서에서 분리된 노드를 `REMOVE` | `parentNode`가 없으면 제거를 건너뜀 | 없음 | 미검증 |
 | EC-017 | patch 중 `MutationObserver` 콜백 | 콜백은 microtask로 patch가 끝난 뒤 실행되므로 patch 도중 재진입이 없음 | 없음 (대역에 MutationObserver 없음) | 미검증 |
 
@@ -60,6 +64,9 @@
 | EC-018 patch 결과는 연산마다 바꾼 DOM 노드를 changed_records로 알려 준다 | 연산별 변경 기록 | EC-018 |
 | EC-019 unmount_tree는 내용을 지우고 컨테이너를 포함한 양쪽 북마크를 해제한다 | unmount 정리 | EC-019 |
 | EC-020 unmount_tree 반복 호출(중복 해제)은 안전하고, 컨테이너가 없으면 TypeError | 중복 해제, 입력 검증 | EC-020 |
+| EC-021 SVG 요소를 만들 때 xlink:href는 xlink 네임스페이스 attribute가 되고 HTML 요소에서는 일반 attribute다 | 생성 시 attribute 네임스페이스 | EC-021 |
+| EC-022 ATTRIBUTES 연산은 xlink:href를 네임스페이스와 함께 추가하고, 값 변경과 제거도 같은 attribute 하나에 적용한다 | 연산 적용 시 attribute 네임스페이스 | EC-022 |
+| EC-023 왕복: 파서처럼 네임스페이스를 붙인 DOM → Virtual DOM → patch로 만든 DOM의 attribute가 같다 | 파서와 같은 DOM | EC-023 |
 
 ## 미검증 항목
 
@@ -69,4 +76,5 @@
 | 바뀐 노드 하이라이트 | Web Animations API(`element.animate`)는 대역에 없음 | 브라우저에서 Patch 후 테두리 애니메이션 확인. 2026-11-10 수동 확인 |
 | `input`의 `value` attribute 변경 | 사용자가 이미 입력한 input은 attribute를 바꿔도 화면 값이 바뀌지 않음 (DOM 표준의 dirty value 동작) | 브라우저에서 입력 후 테스트 영역의 `value` attribute를 바꿔 확인 |
 | 레이아웃, 렌더링 결과 | 대역은 렌더링하지 않음 | 브라우저 화면 확인 |
+| `xlink:href`로 참조하는 SVG `<use>` 렌더링 | 대역은 렌더링하지 않음 | 2026-11-11 Chrome 156에서 확인: mount와 `ATTRIBUTES` 연산 모두 `getBBox` 20×30 (수정 전 0×0) |
 | `iframe`, Shadow DOM 안의 컨테이너 | 대역에 해당 환경 없음 | 브라우저에서 해당 환경에 mount해 확인 |
