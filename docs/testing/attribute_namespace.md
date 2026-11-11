@@ -29,4 +29,4 @@
 
 | 항목 | 이유 | 필요한 검증 방법 |
 | --- | --- | --- |
-| 실제 파서가 붙이는 네임스페이스와 표가 같은지 | 대역에는 HTML 파서가 없음 | 2026-11-11 Chrome 156에서 확인: `innerHTML`로 만든 `svg`(`xmlns:xlink`, `xml:space`), `use`(`xlink:href`, `xml:lang`), HTML `p`(`xlink:href`)의 attribute 네임스페이스·prefix·localName·값이 patch로 만든 DOM과 모두 같음 |
+| 실제 파서가 붙이는 네임스페이스와 표가 같은지 | 대역에는 HTML 파서가 없음 | 2026-11-11 Chrome 156에서 확인: `innerHTML`로 만든 `svg`(`xmlns:xlink`, `xml:space`), `use`(`xlink:href`, `xml:lang`), HTML `p`(`xlink:href`)의 attribute 네임스페이스·prefix·localName·값이 patch로 만든 DOM과 모두 같음 / **Playwright MCP 2차 검증 (2026-11-11, Chromium 157)**: 같은 `svg`·`use`·`p` 입력으로 `innerHTML` 결과와 `mount_tree` 결과의 namespaceURI·prefix·localName·값 목록이 완전히 같음 (`xmlns:xlink`, `xml:space`, `xlink:href`, `xml:lang`; HTML `p`의 `xlink:href`는 네임스페이스 없음) |

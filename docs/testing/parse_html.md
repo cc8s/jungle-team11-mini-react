@@ -26,4 +26,4 @@ Node에는 HTML 파서가 없고, CLAUDE.md는 jsdom 같은 파서 라이브러�
 
 | 항목 | 이유 | 검증 방법과 결과 |
 | --- | --- | --- |
-| EC-003 ~ EC-006 | HTML 파서가 브라우저에만 있음. 자동 테스트로 만들려면 브라우저에서 도는 테스트 페이지가 필요함 | 2026-11-11 Chrome 156(앱 내장 브라우저)에서 `parse_html_to_virtual_tree`를 직접 불러 확인 (결과는 엣지 케이스 표). 2026-11-10에는 실제 화면에서 Patch해도 스크립트가 실행되지 않음을 확인 |
+| EC-003 ~ EC-006 | HTML 파서가 브라우저에만 있음. 자동 테스트로 만들려면 브라우저에서 도는 테스트 페이지가 필요함 | 2026-11-11 Chrome 156(앱 내장 브라우저)에서 `parse_html_to_virtual_tree`를 직접 불러 확인 (결과는 엣지 케이스 표). 2026-11-10에는 실제 화면에서 Patch해도 스크립트가 실행되지 않음을 확인 / **Playwright MCP 2차 검증 (2026-11-11, Chromium 157)**: 빈 문자열 → 자식 0개. script(HTML, SVG)·`img onerror`·`javascript:` 링크는 500ms 뒤에도 실행 0번, 트리는 `img[src]`, `a`(href 없음), 빈 `svg`, `p`. 잘못된 HTML → `ul(li, li) | p | table(tbody(tr(td)))`. `div` 600단계 → 최대 깊이 512, 맨 아래에 형제 89개 |

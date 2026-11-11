@@ -75,9 +75,9 @@
 
 | 항목 | 이유 | 검증 방법과 결과 |
 | --- | --- | --- |
-| 포커스와 선택 영역 보존 | 대역에 포커스 개념이 없음 | 브라우저에서 메모 입력란에 포커스를 두고 Ctrl/⌘+Enter로 Patch. 2026-11-10 수동 확인: Patch와 뒤로가기 뒤에도 같은 `input` 노드와 입력값 유지 |
-| 바뀐 노드 하이라이트 | Web Animations API(`element.animate`)는 대역에 없음 | 브라우저에서 Patch 후 테두리 애니메이션 확인. 2026-11-10 수동 확인 |
-| `input`의 `value` attribute 변경 | 사용자가 이미 입력한 input은 attribute를 바꿔도 화면 값이 바뀌지 않음 (DOM 표준의 dirty value 동작) | 대역은 EC-024로 확인. 2026-11-11 Chrome 156에서도 확인: 고치지 않은 input은 화면 값이 "바뀜", 사용자가 입력한 input은 같은 DOM에서 attribute만 "바뀜"이고 화면 값은 "사용자 입력" 유지 |
-| 레이아웃, 렌더링 결과 | 대역은 렌더링하지 않음 | 브라우저 화면 확인 |
-| `xlink:href`로 참조하는 SVG `<use>` 렌더링 | 대역은 렌더링하지 않음 | 2026-11-11 Chrome 156에서 확인: mount와 `ATTRIBUTES` 연산 모두 `getBBox` 20×30 (수정 전 0×0) |
-| `iframe`, Shadow DOM 안의 컨테이너 | 대역에 해당 환경 없음 | 2026-11-11 Chrome 156에서 확인: iframe 안의 컨테이너에 iframe 문서를 넘겨도, 바깥 문서를 넘겨도(삽입 때 노드가 iframe 문서로 옮겨짐) mount와 patch 결과가 같고 key 있는 행 DOM을 재사용. shadow root 안의 요소와 shadow root 자체를 컨테이너로 써도 같은 결과 |
+| 포커스와 선택 영역 보존 | 대역에 포커스 개념이 없음 | 브라우저에서 메모 입력란에 포커스를 두고 Ctrl/⌘+Enter로 Patch. 2026-11-10 수동 확인: Patch와 뒤로가기 뒤에도 같은 `input` 노드와 입력값 유지 / **Playwright MCP 2차 검증 (2026-11-11, Chromium 157)**: 메모 입력값을 넣고 테스트 영역에서 Ctrl/⌘+Enter로 Patch, 뒤로가기 2번과 앞으로가기 후에도 같은 `input` 노드, 값 "메모 값" 유지 |
+| 바뀐 노드 하이라이트 | Web Animations API(`element.animate`)는 대역에 없음 | 브라우저에서 Patch 후 테두리 애니메이션 확인. 2026-11-10 수동 확인 / **Playwright MCP 2차 검증 (2026-11-11, Chromium 157)**: 지금은 테두리가 아니라 inset box-shadow 회색 상자. `li` 글자 Patch 후 1400ms 애니메이션, 키프레임 0.07 → 0, 모서리 6px, `style` 없음 |
+| `input`의 `value` attribute 변경 | 사용자가 이미 입력한 input은 attribute를 바꿔도 화면 값이 바뀌지 않음 (DOM 표준의 dirty value 동작) | 대역은 EC-024로 확인. 2026-11-11 Chrome 156에서도 확인: 고치지 않은 input은 화면 값이 "바뀜", 사용자가 입력한 input은 같은 DOM에서 attribute만 "바뀜"이고 화면 값은 "사용자 입력" 유지 / **Playwright MCP 2차 검증 (2026-11-11, Chromium 157)**: 고치지 않은 input은 화면 값 "바뀜", 사용자가 입력한 input은 같은 DOM에서 attribute만 "바뀜"이고 화면 값 "사용자 입력" 유지 |
+| 레이아웃, 렌더링 결과 | 대역은 렌더링하지 않음 | 브라우저 화면 확인 / **Playwright MCP 2차 검증 (2026-11-11, Chromium 157)**: 1440×900, 1440×660, 1024×768, 375×812에서 Phase 1 실제 영역이 patch 결과대로 그려지고 넘침·가로 스크롤 없음 (`app.md` EC-011 ~ EC-018) |
+| `xlink:href`로 참조하는 SVG `<use>` 렌더링 | 대역은 렌더링하지 않음 | 2026-11-11 Chrome 156에서 확인: mount와 `ATTRIBUTES` 연산 모두 `getBBox` 20×30 (수정 전 0×0) / **Playwright MCP 2차 검증 (2026-11-11, Chromium 157)**: mount 직후 `getBBox` 20×30, `xlink:href`를 다른 `rect`로 바꾸는 `ATTRIBUTES` 뒤에도 20×30 |
+| `iframe`, Shadow DOM 안의 컨테이너 | 대역에 해당 환경 없음 | 2026-11-11 Chrome 156에서 확인: iframe 안의 컨테이너에 iframe 문서를 넘겨도, 바깥 문서를 넘겨도(삽입 때 노드가 iframe 문서로 옮겨짐) mount와 patch 결과가 같고 key 있는 행 DOM을 재사용. shadow root 안의 요소와 shadow root 자체를 컨테이너로 써도 같은 결과 / **Playwright MCP 2차 검증 (2026-11-11, Chromium 157)**: iframe 문서를 넘긴 경우, 바깥 문서를 넘긴 경우, shadow 안 요소, shadow root 자체 모두 결과가 같고 key 있는 `li` DOM 재사용, 노드 `ownerDocument`가 컨테이너 문서 |

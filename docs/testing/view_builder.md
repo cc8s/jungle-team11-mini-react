@@ -65,4 +65,4 @@ create_view_element('button', {
 
 | 항목 | 이유 | 검증 방법과 결과 |
 | --- | --- | --- |
-| 실제 브라우저에서 막힌 attribute가 빠진 채 그려지는지 | 대역은 렌더링하지 않음 | 2026-11-11 Chrome 156에서 `create_view_root` → `mount_tree`로 확인: `a`는 `class`, `download=""`만 남음(`javascript:` href, `onclick`, `hidden: false` 빠짐), `iframe`은 `srcdoc` 없이 `title`만, `img`는 `data:text/html` src와 `onerror` 없이 `alt`만, `p` 안의 HTML 문자열은 텍스트 노드 하나, SVG는 네임스페이스와 `viewBox` 대소문자 유지, `opacity` 애니메이션은 그려지고 URL 애니메이션은 `TypeError`. 콘솔 오류 없음 |
+| 실제 브라우저에서 막힌 attribute가 빠진 채 그려지는지 | 대역은 렌더링하지 않음 | 2026-11-11 Chrome 156에서 `create_view_root` → `mount_tree`로 확인: `a`는 `class`, `download=""`만 남음(`javascript:` href, `onclick`, `hidden: false` 빠짐), `iframe`은 `srcdoc` 없이 `title`만, `img`는 `data:text/html` src와 `onerror` 없이 `alt`만, `p` 안의 HTML 문자열은 텍스트 노드 하나, SVG는 네임스페이스와 `viewBox` 대소문자 유지, `opacity` 애니메이션은 그려지고 URL 애니메이션은 `TypeError`. 콘솔 오류 없음 / **Playwright MCP 2차 검증 (2026-11-11, Chromium 157)**: `a`는 `class`, `download=""`만, `iframe`은 `title`만, `img`는 `alt`만, `p` 안 HTML 문자열은 텍스트 노드 하나, SVG 네임스페이스와 `viewBox` 유지, `opacity` 애니메이션은 그려지고 href 대상 `animate`는 `TypeError` |
