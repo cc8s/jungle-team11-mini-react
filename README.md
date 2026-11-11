@@ -31,23 +31,9 @@
 
 ## 아키텍처
 
-```mermaid
-flowchart TD
-  subgraph phase1["Phase 1"]
-    html["테스트 영역 HTML"]
-  end
-  subgraph phase2["Phase 2"]
-    set_state["set_state()"] -->|"queueMicrotask (batching)"| update["update(): 렌더 함수 실행"]
-  end
-  html -->|"parse_html (template, inert)"| new_tree["새 Virtual DOM"]
-  update --> new_tree
-  old_tree["이전 Virtual DOM"] --> diff{{"diff_trees"}}
-  new_tree --> diff
-  diff -->|"연산 목록 TEXT · ADD · MOVE · BIND ..."| patch["apply_operations"]
-  patch -->|"바뀐 노드만"| dom[("실제 DOM")]
-  patch -.->|"갱신"| bookmark["양방향 북마크"]
-  new_tree -->|"Phase 1 확정"| history["State History<br/>v1 → v2 → v3<br/>바뀌지 않은 노드는 객체 공유"]
-```
+<p align="center">
+  <img src="docs/images/architecture.png" width="100%" alt="Phase 1의 테스트 영역 HTML과 Phase 2의 set_state가 새 Virtual DOM으로 모이고, 이전 Virtual DOM과 diff_trees로 비교한 연산 목록을 apply_operations가 실제 DOM에 반영하며 양방향 북마크를 갱신하는 구조" />
+</p>
 
 | 모듈 | 하는 일 |
 |---|---|
@@ -123,25 +109,9 @@ flowchart TD
 
 Virtual DOM 노드와 실제 DOM 노드를 **양쪽에서 서로 가리키는** 연결입니다. 노드는 순수 데이터로 두고, 연결 정보는 노드 밖에 둡니다.
 
-```mermaid
-flowchart LR
-  subgraph virtual_tree["Virtual DOM · 동결된 순수 데이터"]
-    v_ul["{ type: ul, key: todo_list }"]
-    v_li_a["└ { type: li, key: a }"]
-    v_text["&nbsp;&nbsp;&nbsp;└ { type: text, text: 장보기 }"]
-    v_li_b["└ { type: li, key: b }"]
-  end
-  subgraph dom_tree["실제 DOM"]
-    d_ul["&lt;ul id=todo_list&gt;"]
-    d_li_a["└ &lt;li id=a&gt;"]
-    d_text["&nbsp;&nbsp;&nbsp;└ '장보기'"]
-    d_li_b["└ &lt;li id=b&gt;"]
-  end
-  v_ul <==>|"WeakMap → · ← __virtual_node"| d_ul
-  v_li_a <==>|"WeakMap → · ← __virtual_node"| d_li_a
-  v_text <==>|"WeakMap → · ← __virtual_node"| d_text
-  v_li_b <==>|"WeakMap → · ← __virtual_node"| d_li_b
-```
+<p align="center">
+  <img src="docs/images/bookmark.png" width="100%" alt="Virtual DOM 노드에서 실제 DOM 노드로는 WeakMap이, 실제 DOM 노드에서 Virtual DOM 노드로는 __virtual_node가 서로를 가리키는 양방향 북마크 구조" />
+</p>
 
 | 방향 | 저장 위치 | 쓰는 곳 |
 |---|---|---|
