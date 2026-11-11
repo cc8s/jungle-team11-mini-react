@@ -77,10 +77,10 @@ new FunctionComponent(counter_root, document.querySelector('#counter')).mount();
 | EC-029 | key 있는 1000개 목록 뒤집기 (대량 노드) | DOM 노드 재사용 | EC-029 key(id)가 있는 1000개 목록을 뒤집어도 DOM 노드를 재사용한다 | 통과 |
 | EC-030 | 대역의 이벤트 전파 순서, 전파 중 리스너 제거 | capture → target → bubble, 제거된 리스너 미호출 | EC-030 대역 확인: dispatchEvent는 capture → target → bubble 순서이고 전파 중 제거된 리스너는 불리지 않는다 | 통과 |
 | EC-031 | effect 하나가 예외 | 오류를 던지고 그 뒤 effect는 이번에 실행되지 않으며 다음 update에서 실행됨. 예외 난 effect는 의존성이 이미 저장되어 다시 실행되지 않음 | EC-031 effect 하나가 실패하면 뒤의 effect는 이번에 실행되지 않고 다음 update에서 실행된다 | 통과 |
-| EC-032 | microtask로 예약된 update에서 렌더 함수 예외 | 호출한 코드가 없으므로 전역 오류(브라우저 `error` 이벤트, Node `uncaughtException`)로 보고됨 | 없음 | 미검증 |
-| EC-033 | 자식에 넘긴 props 안의 객체 수정 | 얕은 동결이라 막지 못함. 자식은 props를 읽기만 해야 함 | 없음 (알려진 한계) | 미검증 |
-| EC-034 | 자식 컴포넌트를 `render_child_component` 없이 직접 호출 | 자식 안의 Hook이 루트의 칸을 차지해 오류로 막지 못함 | 없음 (알려진 한계) | 미검증 |
-| EC-035 | 핸들러가 capture로 받는 이벤트(`focus` 등)에서 `stopPropagation()` | 컨테이너 capture 단계에서 멈추므로 대상 요소에 직접 붙인 다른 리스너도 불리지 않음 | 없음 (알려진 한계) | 미검증 |
+| EC-032 | microtask로 예약된 update에서 렌더 함수 예외 | 호출한 코드가 없으므로 전역 오류(브라우저 `error` 이벤트, Node `uncaughtException`)로 보고됨 | 없음 (2026-11-11 앱 내장 브라우저(Chrome 156): `set_state`를 부른 코드에는 예외가 오지 않고, 전역 `error` 이벤트로 `Uncaught Error: 렌더 실패 시험`이 보고됨. DOM은 이전 결과 그대로) | 통과 |
+| EC-033 | 자식에 넘긴 props 안의 객체 수정 | 얕은 동결이라 막지 못함. 자식은 props를 읽기만 해야 함 | 없음 (알려진 한계, 2026-11-11 앱 내장 브라우저(Chrome 156): 자식이 `props.settings.theme`을 바꾸자 부모 쪽 객체도 바뀜) | 통과 |
+| EC-034 | 자식 컴포넌트를 `render_child_component` 없이 직접 호출 | 자식 안의 Hook이 루트의 칸을 차지해 오류로 막지 못함 | 없음 (알려진 한계, 2026-11-11 앱 내장 브라우저(Chrome 156): 자식을 직접 부르면 오류 없이 그려지고 루트 hooks가 2칸이 됨) | 통과 |
+| EC-035 | 핸들러가 capture로 받는 이벤트(`focus` 등)에서 `stopPropagation()` | 컨테이너 capture 단계에서 멈추므로 대상 요소에 직접 붙인 다른 리스너도 불리지 않음 | 없음 (알려진 한계, 2026-11-11 앱 내장 브라우저(Chrome 156): `focus`는 컨테이너 capture로 등록되고, 핸들러가 `stopPropagation()`하면 input에 직접 붙인 리스너는 불리지 않음) | 통과 |
 | EC-036 | `on_rendered` 호출 시점과 내용, 함수가 아닌 `on_rendered`, `null` 옵션 | mount·update마다 patch 직후 effect보다 먼저, 연산과 바뀐 DOM 전달. 잘못된 옵션은 `TypeError` | EC-036 on_rendered는 mount와 update의 patch 직후 연산과 바뀐 DOM을 알려 주고, 잘못된 옵션은 TypeError | 통과 |
 
 ## 유닛 테스트
@@ -122,11 +122,11 @@ new FunctionComponent(counter_root, document.querySelector('#counter')).mount();
 
 ## 미검증 항목
 
-| 항목 | 이유 | 필요한 검증 방법 |
+| 항목 | 이유 | 검증 방법과 결과 |
 | --- | --- | --- |
-| 포커스와 선택 영역 보존 | 대역에 포커스와 선택 영역 개념이 없음 | 브라우저에서 입력란에 타이핑해 State가 바뀌는 동안 커서와 선택 영역이 유지되는지 확인 |
-| 실제 이벤트 전파 (`click`, `input`, `focus`, `submit`의 기본 동작) | 대역은 사용자 입력과 기본 동작을 흉내 내지 않음 | 브라우저에서 클릭, 입력, 폼 제출 후 화면 갱신 확인 |
-| Shadow DOM 안의 컨테이너 | Shadow 경계를 넘으면 `event.target`이 host로 바뀜(retargeting). 대역에 없음 | 브라우저에서 shadow root 안에 mount해 클릭 확인 |
-| `iframe` 안의 컨테이너 | 다른 `document`의 노드를 만들어야 함 | 브라우저에서 `iframe.contentDocument`의 요소에 mount |
-| `MutationObserver` 콜백 시점 | 대역에 없음. State 변경 → update가 microtask라 같은 microtask 대기열에서 순서가 섞일 수 있음 | 브라우저에서 컨테이너를 관찰하며 update 직후 기록 순서 확인 |
+| 포커스와 선택 영역 보존 | 대역에 포커스와 선택 영역 개념이 없음 | 2026-11-11 앱 내장 브라우저(Chrome 156)에서 실제 키 입력으로 확인: 입력할 때마다 State가 바뀌어 다시 그려져도 같은 input DOM, 포커스 유지, `shift+←` 선택 [1, 2] 뒤 X 입력 → `aXcd`, 커서 2 |
+| 실제 이벤트 전파 (`click`, `input`, `focus`, `submit`의 기본 동작) | 대역은 사용자 입력과 기본 동작을 흉내 내지 않음 | 2026-11-11 앱 내장 브라우저(Chrome 156)에서 확인: 실제 클릭 2번 → `클릭 2`, input에서 Enter → submit 핸들러 1번, `preventDefault`로 페이지 이동 없음, 실제 타이핑 → input 핸들러로 State 반영 |
+| Shadow DOM 안의 컨테이너 | Shadow 경계를 넘으면 `event.target`이 host로 바뀜(retargeting). 대역에 없음 | 2026-11-11 앱 내장 브라우저(Chrome 156)에서 확인: shadow root 안의 컨테이너에서 버튼 안 `b`를 클릭하면 핸들러가 받는 target은 shadow 안의 실제 `b`, 처리 노드는 버튼, 문서 수준 리스너에는 host로 보임. State 갱신 정상 |
+| `iframe` 안의 컨테이너 | 다른 `document`의 노드를 만들어야 함 | 2026-11-11 앱 내장 브라우저(Chrome 156)에서 확인: iframe 문서의 요소에 mount하면 노드가 iframe 문서와 그 realm의 `HTMLElement`로 만들어지고, 클릭으로 State 갱신 정상 |
+| `MutationObserver` 콜백 시점 | 대역에 없음 | 2026-11-11 앱 내장 브라우저(Chrome 156)에서 확인: 클릭 직후 동기 코드에서는 DOM이 그대로(`count 0`), 클릭 뒤 예약한 microtask에서는 이미 갱신(`count 1`, update microtask가 먼저 예약됨), observer는 그 뒤 기록 1개로 한 번 불림 |
 | 렌더링 결과 레이아웃 | 대역은 렌더링하지 않음 | 브라우저 화면 확인 |
