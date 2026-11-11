@@ -31,35 +31,21 @@
 
 ## 아키텍처
 
-```mermaid
-flowchart TD
-  subgraph phase1["Phase 1"]
-    html["테스트 영역 HTML"]
-  end
-  subgraph phase2["Phase 2"]
-    set_state["set_state()"] -->|"queueMicrotask (batching)"| update["update(): 렌더 함수 실행"]
-  end
-  html -->|"parse_html (template, inert)"| new_tree["새 Virtual DOM"]
-  update --> new_tree
-  old_tree["이전 Virtual DOM"] --> diff{{"diff_trees"}}
-  new_tree --> diff
-  diff -->|"연산 목록 TEXT · ADD · MOVE · BIND ..."| patch["apply_operations"]
-  patch -->|"바뀐 노드만"| dom[("실제 DOM")]
-  patch -.->|"갱신"| bookmark["양방향 북마크"]
-  new_tree -->|"Phase 1 확정"| history["State History<br/>v1 → v2 → v3<br/>바뀌지 않은 노드는 객체 공유"]
-```
+<p align="center">
+  <img src="docs/images/architecture.png" width="100%" alt="Phase 1의 테스트 영역 HTML과 Phase 2의 set_state가 새 Virtual DOM으로 모이고, 이전 Virtual DOM과 diff_trees로 비교한 연산 목록을 apply_operations가 실제 DOM에 반영하며 양방향 북마크를 갱신하는 구조" />
+</p>
 
-| 모듈 | 하는 일 |
-|---|---|
-| [`virtual_node.js`](src/virtual_node.js) | 노드 정의, 실제 DOM → Virtual DOM 변환, 위험한 요소·attribute 차단 |
-| [`parse_html.js`](src/parse_html.js) | HTML 문자열 → Virtual DOM (`<template>` 사용, 스크립트 실행 없음) |
-| [`diff.js`](src/diff.js) | 두 트리를 비교해 연산 목록 생성, 노드 공유 |
-| [`patch.js`](src/patch.js) | 연산을 실제 DOM에 적용, 양방향 북마크 관리 |
-| [`state_history.js`](src/state_history.js) | 뒤로·앞으로·갈래 버리기 (최대 50개) |
-| [`operation_summary.js`](src/operation_summary.js) | 연산 목록 → `2개 변경 반영 (TEXT 1, ADD 1)` |
-| [`function_component.js`](src/function_component.js) | `FunctionComponent`와 Hooks |
-| [`view_builder.js`](src/view_builder.js) | `create_view_element`, 이벤트 핸들러 보관 |
-| [`song_board.js`](src/song_board.js) | Phase 2 예제 앱 (최애곡 모음) |
+| 모듈                                                 | 하는 일                                                            |
+| ---------------------------------------------------- | ------------------------------------------------------------------ |
+| [`virtual_node.js`](src/virtual_node.js)             | 노드 정의, 실제 DOM → Virtual DOM 변환, 위험한 요소·attribute 차단 |
+| [`parse_html.js`](src/parse_html.js)                 | HTML 문자열 → Virtual DOM (`<template>` 사용, 스크립트 실행 없음)  |
+| [`diff.js`](src/diff.js)                             | 두 트리를 비교해 연산 목록 생성, 노드 공유                         |
+| [`patch.js`](src/patch.js)                           | 연산을 실제 DOM에 적용, 양방향 북마크 관리                         |
+| [`state_history.js`](src/state_history.js)           | 뒤로·앞으로·갈래 버리기 (최대 50개)                                |
+| [`operation_summary.js`](src/operation_summary.js)   | 연산 목록 → `2개 변경 반영 (TEXT 1, ADD 1)`                        |
+| [`function_component.js`](src/function_component.js) | `FunctionComponent`와 Hooks                                        |
+| [`view_builder.js`](src/view_builder.js)             | `create_view_element`, 이벤트 핸들러 보관                          |
+| [`song_board.js`](src/song_board.js)                 | Phase 2 예제 앱 (최애곡 모음)                                      |
 
 ## 핵심 로직
 
@@ -87,15 +73,15 @@ flowchart TD
 
 #### 2. Diff — 7가지 연산
 
-| 연산 | 언제 |
-|---|---|
-| `TEXT` | 텍스트·주석 내용만 바뀜 |
-| `ATTRIBUTES` | 같은 요소의 attribute가 추가·변경·삭제됨 |
-| `ADD` | 새 노드가 생김 |
-| `REMOVE` | 노드가 사라짐 |
-| `REPLACE` | 같은 자리의 노드 종류(태그)가 바뀜 |
-| `MOVE` | `id`(key)가 같은 노드의 순서가 바뀜 |
-| `BIND` | 내용이 같아 DOM은 그대로 두고 북마크만 옮김 |
+| 연산         | 언제                                        |
+| ------------ | ------------------------------------------- |
+| `TEXT`       | 텍스트·주석 내용만 바뀜                     |
+| `ATTRIBUTES` | 같은 요소의 attribute가 추가·변경·삭제됨    |
+| `ADD`        | 새 노드가 생김                              |
+| `REMOVE`     | 노드가 사라짐                               |
+| `REPLACE`    | 같은 자리의 노드 종류(태그)가 바뀜          |
+| `MOVE`       | `id`(key)가 같은 노드의 순서가 바뀜         |
+| `BIND`       | 내용이 같아 DOM은 그대로 두고 북마크만 옮김 |
 
 자식은 다음 순서로 짝짓습니다.
 
@@ -111,41 +97,25 @@ flowchart TD
 
 그래서 **"노드에도 인덱스를 붙여 두면 어떨까?"** 하는 아이디어가 나왔고, 이를 양방향 북마크로 구현했습니다.
 
-| 책 | Mini React |
-|---|---|
-| 책의 한 페이지 | Virtual DOM 노드 하나 |
-| 페이지에 붙인 인덱스 스티커 | 북마크 (Virtual DOM 노드 → 실제 DOM 노드) |
-| 스티커를 보고 바로 펼치기 | patch가 대상 DOM을 트리 순회 없이 바로 찾기 |
+| 책                                             | Mini React                                       |
+| ---------------------------------------------- | ------------------------------------------------ |
+| 책의 한 페이지                                 | Virtual DOM 노드 하나                            |
+| 페이지에 붙인 인덱스 스티커                    | 북마크 (Virtual DOM 노드 → 실제 DOM 노드)        |
+| 스티커를 보고 바로 펼치기                      | patch가 대상 DOM을 트리 순회 없이 바로 찾기      |
 | 개정판이 나오면 스티커를 새 책으로 옮겨 붙이기 | `BIND` — 내용이 같으면 북마크만 새 노드로 옮기기 |
-| 버린 책의 스티커는 함께 사라짐 | `WeakMap` — 버려진 노드의 북마크는 GC가 회수 |
+| 버린 책의 스티커는 함께 사라짐                 | `WeakMap` — 버려진 노드의 북마크는 GC가 회수     |
 
 ##### 구조
 
 Virtual DOM 노드와 실제 DOM 노드를 **양쪽에서 서로 가리키는** 연결입니다. 노드는 순수 데이터로 두고, 연결 정보는 노드 밖에 둡니다.
 
-```mermaid
-flowchart LR
-  subgraph virtual_tree["Virtual DOM · 동결된 순수 데이터"]
-    v_ul["{ type: ul, key: todo_list }"]
-    v_li_a["└ { type: li, key: a }"]
-    v_text["&nbsp;&nbsp;&nbsp;└ { type: text, text: 장보기 }"]
-    v_li_b["└ { type: li, key: b }"]
-  end
-  subgraph dom_tree["실제 DOM"]
-    d_ul["&lt;ul id=todo_list&gt;"]
-    d_li_a["└ &lt;li id=a&gt;"]
-    d_text["&nbsp;&nbsp;&nbsp;└ '장보기'"]
-    d_li_b["└ &lt;li id=b&gt;"]
-  end
-  v_ul <==>|"WeakMap → · ← __virtual_node"| d_ul
-  v_li_a <==>|"WeakMap → · ← __virtual_node"| d_li_a
-  v_text <==>|"WeakMap → · ← __virtual_node"| d_text
-  v_li_b <==>|"WeakMap → · ← __virtual_node"| d_li_b
-```
+<p align="center">
+  <img src="docs/images/bookmark.png" width="100%" alt="Virtual DOM 노드에서 실제 DOM 노드로는 WeakMap이, 실제 DOM 노드에서 Virtual DOM 노드로는 __virtual_node가 서로를 가리키는 양방향 북마크 구조" />
+</p>
 
-| 방향 | 저장 위치 | 쓰는 곳 |
-|---|---|---|
-| Virtual DOM → DOM | `WeakMap` | patch가 고칠 DOM을 트리 순회 없이 바로 찾음 |
+| 방향              | 저장 위치                 | 쓰는 곳                                       |
+| ----------------- | ------------------------- | --------------------------------------------- |
+| Virtual DOM → DOM | `WeakMap`                 | patch가 고칠 DOM을 트리 순회 없이 바로 찾음   |
 | DOM → Virtual DOM | `dom_node.__virtual_node` | 이벤트 대상 DOM에서 노드와 핸들러를 바로 찾음 |
 
 ##### 왜 위치 대신 노드를 가리키나
@@ -163,14 +133,14 @@ flowchart LR
 
 북마크는 [`patch.js`](src/patch.js) **한 곳에서만** 바뀝니다.
 
-| 시점 | 연산 | 북마크 |
-|---|---|---|
-| 처음 그릴 때 | `mount_tree` → `create_dom_tree` | 만든 DOM마다 양방향 연결 |
-| 내용이 같은 노드 | `BIND` | DOM은 그대로, 연결만 새 Virtual DOM 노드로 옮김 |
-| 내용이 바뀐 노드 | `TEXT` `ATTRIBUTES` `MOVE` | 이전 노드로 DOM을 찾아 고침 |
-| 새 노드 | `ADD` `REPLACE` | 새 DOM을 만들며 연결 |
-| 사라진 노드 | `REMOVE` `REPLACE` | 하위 트리 전체를 끊음 (`unbind_subtree`) |
-| 정리 | `unmount_tree` | 컨테이너까지 모두 끊음 |
+| 시점             | 연산                             | 북마크                                          |
+| ---------------- | -------------------------------- | ----------------------------------------------- |
+| 처음 그릴 때     | `mount_tree` → `create_dom_tree` | 만든 DOM마다 양방향 연결                        |
+| 내용이 같은 노드 | `BIND`                           | DOM은 그대로, 연결만 새 Virtual DOM 노드로 옮김 |
+| 내용이 바뀐 노드 | `TEXT` `ATTRIBUTES` `MOVE`       | 이전 노드로 DOM을 찾아 고침                     |
+| 새 노드          | `ADD` `REPLACE`                  | 새 DOM을 만들며 연결                            |
+| 사라진 노드      | `REMOVE` `REPLACE`               | 하위 트리 전체를 끊음 (`unbind_subtree`)        |
+| 정리             | `unmount_tree`                   | 컨테이너까지 모두 끊음                          |
 
 - **비용** — diff는 여전히 트리 전체를 봅니다(O(n)). patch는 바뀐 노드 수 k에만 비례합니다(O(k)).
 - **입력값 보존** — 바뀌지 않은 노드는 DOM을 건드리지 않으므로 입력 중인 값과 포커스가 그대로 남습니다.
@@ -199,11 +169,11 @@ flowchart LR
 
 #### `FunctionComponent`
 
-| 멤버 | 역할 |
-|---|---|
-| `hooks` | Hook의 값을 호출 순서대로 담는 배열 |
-| `mount()` | 처음 렌더링 |
-| `update()` | State 변경 후 다시 렌더링 |
+| 멤버        | 역할                                          |
+| ----------- | --------------------------------------------- |
+| `hooks`     | Hook의 값을 호출 순서대로 담는 배열           |
+| `mount()`   | 처음 렌더링                                   |
+| `update()`  | State 변경 후 다시 렌더링                     |
 | `unmount()` | effect 정리 함수 실행, 리스너·DOM·북마크 정리 |
 
 ```
@@ -226,11 +196,11 @@ flowchart LR
 
 #### Hooks
 
-| Hook | 하는 일 |
-|---|---|
-| `use_state(initial_state)` | `[현재 값, set_state]`. 같은 값(`Object.is`)이면 다시 그리지 않습니다. |
+| Hook                                 | 하는 일                                                                                                |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `use_state(initial_state)`           | `[현재 값, set_state]`. 같은 값(`Object.is`)이면 다시 그리지 않습니다.                                 |
 | `use_effect(callback, dependencies)` | patch가 끝난 뒤 의존성이 바뀌었을 때만 실행합니다. 정리 함수는 다음 실행 전과 `unmount()` 때 부릅니다. |
-| `use_memo(callback, dependencies)` | 의존성이 같으면 이전 계산 값을 그대로 돌려줍니다. |
+| `use_memo(callback, dependencies)`   | 의존성이 같으면 이전 계산 값을 그대로 돌려줍니다.                                                      |
 
 - **Batching** — `set_state`를 여러 번 불러도 `queueMicrotask`로 `update()`를 한 번만 예약합니다.
 - **Lifting State Up** — State는 루트에만 둡니다. 자식은 `render_child_component`로 부르는 순수 함수이고, `props`는 동결해서 넘깁니다.
@@ -239,12 +209,17 @@ flowchart LR
 ## 사용법
 
 ```js
-import { FunctionComponent, use_state, use_effect, render_child_component } from './src/function_component.js';
-import { create_view_element as element } from './src/view_builder.js';
+import {
+  FunctionComponent,
+  use_state,
+  use_effect,
+  render_child_component,
+} from "./src/function_component.js";
+import { create_view_element as element } from "./src/view_builder.js";
 
 // 자식: State 없이 props만 받는 순수 함수
 function counter_label(props) {
-  return element('p', null, [`눌린 횟수: ${props.count}`]);
+  return element("p", null, [`눌린 횟수: ${props.count}`]);
 }
 
 // 루트: Hook과 State는 여기서만
@@ -255,16 +230,22 @@ function counter_root() {
     document.title = `count ${count}`;
   }, [count]);
 
-  return element('section', null, [
+  return element("section", null, [
     render_child_component(counter_label, { count }),
-    element('button', {
-      attributes: { type: 'button' },
-      event_handlers: { click: () => set_count((previous_count) => previous_count + 1) },
-    }, ['+1']),
+    element(
+      "button",
+      {
+        attributes: { type: "button" },
+        event_handlers: {
+          click: () => set_count((previous_count) => previous_count + 1),
+        },
+      },
+      ["+1"],
+    ),
   ]);
 }
 
-new FunctionComponent(counter_root, document.querySelector('#app')).mount();
+new FunctionComponent(counter_root, document.querySelector("#app")).mount();
 ```
 
 <details>
@@ -285,36 +266,44 @@ new FunctionComponent(counter_root, document.querySelector('#app')).mount();
 npm test
 ```
 
-| 구분 | 내용 |
-|---|---|
-| 단위 | `node:test` + `node:assert/strict`, 15개 모듈 · **209개 통과** |
-| DOM 대역 | jsdom 없이 직접 만든 [`test/support/fake_dom.js`](test/support/fake_dom.js) |
+| 구분        | 내용                                                                                           |
+| ----------- | ---------------------------------------------------------------------------------------------- |
+| 단위        | `node:test` + `node:assert/strict`, 15개 모듈 · **209개 통과**                                 |
+| DOM 대역    | jsdom 없이 직접 만든 [`test/support/fake_dom.js`](test/support/fake_dom.js)                    |
 | 엣지 케이스 | 모듈마다 [`docs/testing/<모듈>.md`](docs/testing)에 엣지 케이스 · 유닛 테스트 · 미검증 항목 표 |
-| 브라우저 | 대역으로 확인할 수 없는 레이아웃 · 포커스 · 렌더링은 Playwright MCP로 2차 검증 |
+| 브라우저    | 대역으로 확인할 수 없는 레이아웃 · 포커스 · 렌더링은 Playwright MCP로 2차 검증                 |
 
 <details>
-<summary><b>검토한 엣지 케이스 예시</b></summary>
+<summary><b>실제 검토한 엣지 케이스 </b></summary>
 
 - `id` 없음 · 중복 · 변경, 들여쓰기 공백 · 주석만 바뀐 경우
 - 처음에서 뒤로가기, 뒤로 간 상태에서 수정 없이 Patch
 - `<script>`, `onclick`, `javascript:` URL, SVG `animate`로 `href` 바꾸기 (XSS)
 - SVG · MathML namespace, 깊은 중첩과 대량 노드
 - 렌더링 중 `set_state`, 조건문 안의 Hook, effect 안에서 `unmount()`
+- 테스트 영역에 스페이스를 쳤다가 지우면 바뀐 내용이 없으므로 Patch 버튼이 다시 꺼진다
+- 뒤로 간 상태에서 고쳐서 Patch하면 브라우저처럼 그 뒤의 이력을 버리고 새 상태를 붙인다 (v1 → v2 → v3에서 v2로 가서 고치면 v1 → v2 → v4)
+- 곡 추가에서 한글을 입력하다 조합 중에 Enter를 눌러도 마지막 글자가 빠지거나 곡이 두 번 추가되지 않는다
+- 주석 안 공백이나 이모지, 태그 사이 공백만 바꾼 Patch는 이력에 "화면 변화 없음"으로 남고 하이라이트가 뜨지 않는다
+- `<pre>` 안 공백과 nbsp 변경은 화면에 보이는 변경으로 본다
+- 수정 중인 곡이 필터 때문에 가려지면 수정을 취소한다 (전에는 다시 보일 때 원래 값의 폼이 되살아나고 입력이 사라졌다)
+- 하이라이트가 검정 "메인" 버튼처럼 배경이 있는 요소의 색과 글자를 가리지 않는다
+- 창 높이가 낮아도 (1440×660) 본문에 스크롤바가 생기지 않는다
 
 </details>
 
 ## 실제 React와 비교
 
-| 항목 | React | Mini React |
-|---|---|---|
-| 화면 기술 | JSX | `create_view_element` 함수 호출 |
-| State 위치 | 모든 컴포넌트 | 루트 컴포넌트만 (자식은 props만) |
-| 비교 범위 | setState한 컴포넌트의 서브트리 | 루트부터 전체 트리 |
-| 렌더링 | 중단·재개 가능 (Fiber) | 한 번에 동기 실행 |
-| DOM 연결 | Fiber 노드가 참조 보유 | 노드 밖 `WeakMap` + `__virtual_node` |
-| key | `key` prop | `id` attribute |
-| 과거 상태 | 기본 기능 없음 | State History (뒤로·앞으로) |
-| 의존성 | `react`, `react-dom` | 없음 |
+| 항목       | React                          | Mini React                           |
+| ---------- | ------------------------------ | ------------------------------------ |
+| 화면 기술  | JSX                            | `create_view_element` 함수 호출      |
+| State 위치 | 모든 컴포넌트                  | 루트 컴포넌트만 (자식은 props만)     |
+| 비교 범위  | setState한 컴포넌트의 서브트리 | 루트부터 전체 트리                   |
+| 렌더링     | 중단·재개 가능 (Fiber)         | 한 번에 동기 실행                    |
+| DOM 연결   | Fiber 노드가 참조 보유         | 노드 밖 `WeakMap` + `__virtual_node` |
+| key        | `key` prop                     | `id` attribute                       |
+| 과거 상태  | 기본 기능 없음                 | State History (뒤로·앞으로)          |
+| 의존성     | `react`, `react-dom`           | 없음                                 |
 
 ### 장점
 
