@@ -1,0 +1,10 @@
+{
+  "mini_react": {
+    "raw_bytes": 36445,
+    "gzip_bytes": 10709
+  },
+  "react_18": {
+    "raw_bytes": 158504,
+    "gzip_bytes": 50590
+  }
+}

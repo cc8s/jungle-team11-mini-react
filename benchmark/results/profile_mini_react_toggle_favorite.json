@@ -1,0 +1,102 @@
+[
+  {
+    "function_label": "are_attributes_equal @mini_react.js:80",
+    "self_ms_per_action": 9.851694797687859
+  },
+  {
+    "function_label": "(program) @:0",
+    "self_ms_per_action": 8.678873988439305
+  },
+  {
+    "function_label": "diff_children @mini_react.js:200",
+    "self_ms_per_action": 4.749924277456647
+  },
+  {
+    "function_label": "(garbage collector) @:0",
+    "self_ms_per_action": 3.8116676300578027
+  },
+  {
+    "function_label": "match_children @mini_react.js:128",
+    "self_ms_per_action": 3.7823471098265893
+  },
+  {
+    "function_label": "bind_bookmark @mini_react.js:293",
+    "self_ms_per_action": 3.254577745664739
+  },
+  {
+    "function_label": "create_attribute_record @mini_react.js:29",
+    "self_ms_per_action": 3.0493341040462427
+  },
+  {
+    "function_label": "is_same_tree @mini_react.js:88",
+    "self_ms_per_action": 2.7268083815028894
+  },
+  {
+    "function_label": "create_view_element @mini_react.js:535",
+    "self_ms_per_action": 2.6681673410404616
+  },
+  {
+    "function_label": "create_element_node @mini_react.js:51",
+    "self_ms_per_action": 2.3163210982658957
+  },
+  {
+    "function_label": "(anonymous) @mini_react.js:85",
+    "self_ms_per_action": 1.8765132947976877
+  },
+  {
+    "function_label": "create_attribute_record2 @mini_react.js:468",
+    "self_ms_per_action": 1.81787225433526
+  },
+  {
+    "function_label": "synchronize_event_listeners @mini_react.js:886",
+    "self_ms_per_action": 1.6712696531791906
+  },
+  {
+    "function_label": "(idle) @:0",
+    "self_ms_per_action": 1.6126286127167628
+  },
+  {
+    "function_label": "render_tree @mini_react.js:819",
+    "self_ms_per_action": 1.5246670520231214
+  },
+  {
+    "function_label": "update @mini_react.js:778",
+    "self_ms_per_action": 1.2314618497109824
+  },
+  {
+    "function_label": "is_blocked_element_name @mini_react.js:108",
+    "self_ms_per_action": 1.0555387283236994
+  },
+  {
+    "function_label": "is_url_animation_element @mini_react.js:111",
+    "self_ms_per_action": 0.8502950867052022
+  },
+  {
+    "function_label": "freeze_children @mini_react.js:40",
+    "self_ms_per_action": 0.8209745664739885
+  },
+  {
+    "function_label": "apply_operations @mini_react.js:385",
+    "self_ms_per_action": 0.6450514450867051
+  },
+  {
+    "function_label": "render_child_component @mini_react.js:707",
+    "self_ms_per_action": 0.6157309248554912
+  },
+  {
+    "function_label": "create_event_handler_record @mini_react.js:486",
+    "self_ms_per_action": 0.5864104046242774
+  },
+  {
+    "function_label": "normalize_view_children @mini_react.js:507",
+    "self_ms_per_action": 0.5570898843930635
+  },
+  {
+    "function_label": "diff_matched_pair @mini_react.js:239",
+    "self_ms_per_action": 0.5570898843930635
+  },
+  {
+    "function_label": "create_view_root @mini_react.js:557",
+    "self_ms_per_action": 0.4984488439306358
+  }
+]

@@ -1,0 +1,14 @@
+{
+  "started_at": "2026-11-11T12:41:01.221Z",
+  "os_release": "10.0.26200",
+  "cpu_model": "Intel(R) Core(TM) Ultra 7 155H",
+  "cpu_count": 22,
+  "total_memory_gb": 32,
+  "node_version": "v20.17.0",
+  "chromium_version": "158.0.8127.18",
+  "cpu_throttle_rate": 4,
+  "page_count_per_job": 10,
+  "warmup_action_count": 2,
+  "measured_action_count": 10,
+  "finished_at": "2026-11-11T12:50:56.369Z"
+}

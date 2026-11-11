@@ -1,0 +1,102 @@
+[
+  {
+    "function_label": "(program) @:0",
+    "self_ms_per_action": 8.784503086419752
+  },
+  {
+    "function_label": "(idle) @:0",
+    "self_ms_per_action": 2.0201296296296296
+  },
+  {
+    "function_label": "M @react_18.js:88",
+    "self_ms_per_action": 2.0201296296296296
+  },
+  {
+    "function_label": "Bj @react_18.js:4589",
+    "self_ms_per_action": 1.9895216049382713
+  },
+  {
+    "function_label": "Ej @react_18.js:4662",
+    "self_ms_per_action": 1.316145061728395
+  },
+  {
+    "function_label": "Pg @react_18.js:6742",
+    "self_ms_per_action": 0.7652006172839505
+  },
+  {
+    "function_label": "get @react_18.js:15",
+    "self_ms_per_action": 0.6733765432098765
+  },
+  {
+    "function_label": "J @react_18.js:3194",
+    "self_ms_per_action": 0.6733765432098764
+  },
+  {
+    "function_label": "(garbage collector) @:0",
+    "self_ms_per_action": 0.6121604938271604
+  },
+  {
+    "function_label": "dk @react_18.js:5335",
+    "self_ms_per_action": 0.5815524691358024
+  },
+  {
+    "function_label": "Tk @react_18.js:6221",
+    "self_ms_per_action": 0.4897283950617283
+  },
+  {
+    "function_label": "Oj @react_18.js:5046",
+    "self_ms_per_action": 0.42851234567901225
+  },
+  {
+    "function_label": "ub @react_18.js:1169",
+    "self_ms_per_action": 0.39790432098765427
+  },
+  {
+    "function_label": "Nh @react_18.js:3544",
+    "self_ms_per_action": 0.3672962962962963
+  },
+  {
+    "function_label": "song_icon_button @react_18.js:7458",
+    "self_ms_per_action": 0.3672962962962963
+  },
+  {
+    "function_label": "Lg @react_18.js:2984",
+    "self_ms_per_action": 0.3672962962962963
+  },
+  {
+    "function_label": "vb @react_18.js:1179",
+    "self_ms_per_action": 0.36729629629629623
+  },
+  {
+    "function_label": "Vk @react_18.js:6519",
+    "self_ms_per_action": 0.33668827160493825
+  },
+  {
+    "function_label": "Ef @react_18.js:2660",
+    "self_ms_per_action": 0.33668827160493825
+  },
+  {
+    "function_label": "n @react_18.js:3133",
+    "self_ms_per_action": 0.30608024691358027
+  },
+  {
+    "function_label": "normalize_song_text @react_18.js:7267",
+    "self_ms_per_action": 0.3060802469135802
+  },
+  {
+    "function_label": "c @react_18.js:3023",
+    "self_ms_per_action": 0.3060802469135802
+  },
+  {
+    "function_label": "Uk @react_18.js:6227",
+    "self_ms_per_action": 0.27547222222222223
+  },
+  {
+    "function_label": "song_row @react_18.js:7595",
+    "self_ms_per_action": 0.27547222222222223
+  },
+  {
+    "function_label": "create_song_initials @react_18.js:7378",
+    "self_ms_per_action": 0.24486419753086416
+  }
+]
