@@ -11,6 +11,7 @@ import {
   is_text_like_node,
   is_safe_attribute,
   is_blocked_element_name,
+  is_url_animation_element,
 } from './virtual_node.js';
 
 const event_handlers_by_virtual_node = new WeakMap();
@@ -100,9 +101,14 @@ export function create_view_element(element_type, view_options = null, view_chil
   if (view_options !== null && (typeof view_options !== 'object' || Array.isArray(view_options))) {
     throw new TypeError('view_options는 객체여야 합니다');
   }
+  const attribute_record = create_attribute_record(view_options?.attributes);
+  // SVG animate·set은 values, to 값으로 href를 javascript: URL로 바꿀 수 있어 URL 검사를 피해 간다.
+  if (is_url_animation_element(element_type, attribute_record)) {
+    throw new TypeError(`URL attribute를 바꾸는 ${element_type} 요소는 만들 수 없습니다`);
+  }
   const element_node = create_element_node(
     element_type,
-    create_attribute_record(view_options?.attributes),
+    attribute_record,
     normalize_view_children(view_children),
     view_options?.namespace ?? null,
   );

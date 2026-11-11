@@ -149,3 +149,31 @@ test('EC-015 count_view_nodes는 루트 #fragment를 빼고 요소·텍스트 �
   assert.equal(count_view_nodes(create_view_element('p', null, ['단독'])), 2, '#fragment가 아닌 노드는 자신도 셈');
   assert.equal(count_view_nodes(null), 0);
 });
+
+test('EC-016 create_view_element로 10000단계를 중첩해도 루트 만들기, 노드 세기, 이벤트 수집이 스택 넘침 없이 된다', () => {
+  let nested_node = create_view_element('span', { event_handlers: { click: () => {} } }, ['끝']);
+  for (let depth_index = 0; depth_index < 10000; depth_index += 1) {
+    nested_node = create_view_element('div', null, [nested_node]);
+  }
+  const root_node = create_view_root(nested_node);
+  assert.equal(count_view_nodes(root_node), 10002);
+  assert.deepEqual([...collect_event_types(root_node)], ['click']);
+});
+
+test('EC-017 URL attribute를 바꾸는 SVG animate와 set 요소는 TypeError이고 다른 애니메이션은 만든다', () => {
+  for (const [element_name, animation_attributes] of [
+    ['animate', { attributeName: 'href', values: 'javascript:alert(1)' }],
+    ['set', { attributeName: 'xlink:href', to: 'javascript:alert(1)' }],
+    ['animate', { attributeName: ' HREF ', values: 'https://example.com/' }],
+  ]) {
+    assert.throws(
+      () => create_view_element(element_name, { attributes: animation_attributes, namespace: svg_namespace_uri }),
+      TypeError,
+    );
+  }
+  const opacity_node = create_view_element('animate', {
+    attributes: { attributeName: 'opacity', values: '0;1' },
+    namespace: svg_namespace_uri,
+  });
+  assert.equal(opacity_node.attributes.attributeName, 'opacity');
+});

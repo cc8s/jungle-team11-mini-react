@@ -36,7 +36,8 @@ create_view_element('button', {
 | EC-013 | SVG 요소 | `namespace` 옵션 유지, `viewBox` 대소문자 보존 | EC-013 SVG 네임스페이스는 namespace 옵션으로 지정한다 | 통과 |
 | EC-014 | 10000단계 중첩 배열, 형제 5000개 | 반복문이라 스택 넘침 없음 | EC-014 깊게 중첩된 배열(10000단계)과 대량 형제(5000개)도 스택 넘침 없이 펼친다 | 통과 |
 | EC-015 | 노드 수 세기: 루트 `#fragment`, 빈 루트, 단독 노드, `null` | 루트는 빼고 요소·텍스트를 셈, 단독 노드는 자신 포함, `null`은 0 | EC-015 count_view_nodes는 루트 #fragment를 빼고 요소·텍스트 노드를 모두 센다 | 통과 |
-| EC-016 | `create_view_element` 중첩 깊이 | 노드 생성은 렌더 함수의 호출 깊이를 따르므로 이 모듈의 한계가 아님. patch는 `patch.md` EC-015 참고 | 없음 | 미검증 |
+| EC-016 | `create_view_element`로 10000단계 중첩 | 노드 생성은 렌더 함수의 호출 깊이를 따르고, 이 모듈의 `create_view_root`·`count_view_nodes`·`collect_event_types`는 반복문이라 스택 넘침 없음. patch 한계는 `patch.md` EC-015 참고 | EC-016 create_view_element로 10000단계를 중첩해도 루트 만들기, 노드 세기, 이벤트 수집이 스택 넘침 없이 된다 | 통과 |
+| EC-017 | SVG `animate`·`set`의 `attributeName`이 URL attribute(`href`, `xlink:href` 등, 대소문자·공백 포함) | `TypeError` (막힌 요소와 같은 처리). `values`/`to` 값으로 href를 `javascript:` URL로 바꿀 수 있어 URL 값 검사를 피해 가기 때문. 다른 attribute 애니메이션은 만듦 | EC-017 URL attribute를 바꾸는 SVG animate와 set 요소는 TypeError이고 다른 애니메이션은 만든다 | 통과 |
 
 ## 유닛 테스트
 
@@ -57,9 +58,11 @@ create_view_element('button', {
 | EC-013 SVG 네임스페이스는 namespace 옵션으로 지정한다 | SVG 네임스페이스 | EC-013 |
 | EC-014 깊게 중첩된 배열(10000단계)과 대량 형제(5000개)도 스택 넘침 없이 펼친다 | 깊은 중첩, 대량 노드 | EC-014 |
 | EC-015 count_view_nodes는 루트 #fragment를 빼고 요소·텍스트 노드를 모두 센다 | 노드 수 (Phase 2 기록 카드의 "전체 노드 N개") | EC-015 |
+| EC-016 create_view_element로 10000단계를 중첩해도 루트 만들기, 노드 세기, 이벤트 수집이 스택 넘침 없이 된다 | 깊은 중첩 | EC-016 |
+| EC-017 URL attribute를 바꾸는 SVG animate와 set 요소는 TypeError이고 다른 애니메이션은 만든다 | 애니메이션을 통한 XSS 차단 | EC-017 |
 
 ## 미검증 항목
 
-| 항목 | 이유 | 필요한 검증 방법 |
+| 항목 | 이유 | 검증 방법과 결과 |
 | --- | --- | --- |
-| 실제 브라우저에서 막힌 attribute가 빠진 채 그려지는지 | 대역은 렌더링하지 않음 | 브라우저 개발자 도구 Elements 패널에서 attribute 확인 |
+| 실제 브라우저에서 막힌 attribute가 빠진 채 그려지는지 | 대역은 렌더링하지 않음 | 2026-11-11 Chrome 156에서 `create_view_root` → `mount_tree`로 확인: `a`는 `class`, `download=""`만 남음(`javascript:` href, `onclick`, `hidden: false` 빠짐), `iframe`은 `srcdoc` 없이 `title`만, `img`는 `data:text/html` src와 `onerror` 없이 `alt`만, `p` 안의 HTML 문자열은 텍스트 노드 하나, SVG는 네임스페이스와 `viewBox` 대소문자 유지, `opacity` 애니메이션은 그려지고 URL 애니메이션은 `TypeError`. 콘솔 오류 없음 |
