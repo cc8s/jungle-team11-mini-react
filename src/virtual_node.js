@@ -18,6 +18,9 @@ const url_attribute_names = new Set([
   'href', 'src', 'action', 'formaction', 'xlink:href', 'data', 'poster', 'background', 'ping',
 ]);
 const blocked_url_pattern = /^(javascript|vbscript|data:text\/html)/i;
+// SVG 애니메이션 요소는 values, to, from, by 값으로 다른 attribute를 바꾼다.
+// attributeName이 URL attribute를 가리키면 href를 javascript: URL로 바꿀 수 있으므로 요소째 막는다.
+const animation_element_names = new Set(['animate', 'set']);
 
 const empty_attributes = Object.freeze(Object.create(null));
 const empty_children = Object.freeze([]);
@@ -142,6 +145,14 @@ export function is_blocked_element_name(element_name) {
   return blocked_element_names.has(String(element_name).toLowerCase());
 }
 
+// 값을 검사하지 않고 URL attribute를 바꾸는 애니메이션 요소인지 판단한다.
+export function is_url_animation_element(element_name, attributes) {
+  if (!animation_element_names.has(String(element_name).toLowerCase())) return false;
+  const target_attribute_name = attributes?.attributeName;
+  if (typeof target_attribute_name !== 'string') return false;
+  return url_attribute_names.has(target_attribute_name.trim().toLowerCase());
+}
+
 function convert_child_nodes(child_node_list) {
   // childNodes는 live 컬렉션이므로 먼저 배열로 복사한 뒤 순회한다.
   const converted_children = [];
@@ -172,6 +183,7 @@ export function create_virtual_node_from_dom(dom_node) {
           safe_attributes[attribute_node.name] = attribute_node.value;
         }
       }
+      if (is_url_animation_element(dom_node.localName, safe_attributes)) return null;
       // <template>의 자식은 childNodes가 아니라 content(DocumentFragment)에 있다.
       const child_source =
         dom_node.localName === 'template' && dom_node.content ? dom_node.content.childNodes : dom_node.childNodes;

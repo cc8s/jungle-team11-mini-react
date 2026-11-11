@@ -9,6 +9,7 @@ import {
   create_root_from_container,
   is_same_tree,
   is_safe_attribute,
+  is_url_animation_element,
   text_node_type,
   comment_node_type,
   fragment_node_type,
@@ -245,3 +246,32 @@ test('EC-019 HTML 파서 중첩 제한(512단계)보다 충분히 깊은 3000단
   assert.doesNotThrow(() => create_virtual_node_from_dom(root_element));
 });
 
+test('EC-020 URL attribute를 바꾸는 SVG animate와 set 요소는 변환에서 제외하고 다른 애니메이션은 남긴다', () => {
+  const owner_document = new fake_document();
+  const create_animation_element = (element_name, animation_attributes) => {
+    const animation_element = owner_document.createElementNS(svg_namespace_uri, element_name);
+    for (const [attribute_name, attribute_value] of Object.entries(animation_attributes)) {
+      animation_element.setAttribute(attribute_name, attribute_value);
+    }
+    return animation_element;
+  };
+  const anchor_element = owner_document.createElementNS(svg_namespace_uri, 'a');
+  for (const animation_element of [
+    create_animation_element('animate', { attributeName: 'href', values: 'javascript:alert(1)' }),
+    create_animation_element('set', { attributeName: 'xlink:href', to: 'javascript:alert(1)' }),
+    create_animation_element('animate', { attributeName: ' HREF ', values: 'javascript:alert(1)' }),
+    create_animation_element('set', { attributeName: 'href', to: 'https://example.com/' }),
+    create_animation_element('animate', { attributeName: 'opacity', values: '0;1' }),
+  ]) {
+    anchor_element.appendChild(animation_element);
+  }
+  const anchor_node = create_virtual_node_from_dom(anchor_element);
+  assert.deepEqual(
+    anchor_node.children.map((child_node) => child_node.attributes.attributeName),
+    ['opacity'],
+  );
+  assert.equal(is_url_animation_element('animate', { attributeName: 'href' }), true);
+  assert.equal(is_url_animation_element('animate', { attributeName: 'fill' }), false);
+  assert.equal(is_url_animation_element('rect', { attributeName: 'href' }), false);
+  assert.equal(is_url_animation_element('set', {}), false);
+});

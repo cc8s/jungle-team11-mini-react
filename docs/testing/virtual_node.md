@@ -1,6 +1,6 @@
 # virtual_node
 
-`src/virtual_node.js` — Virtual DOM 노드 정의, 트리 비교, DOM → Virtual DOM 변환, 안전하지 않은 요소와 attribute 걸러내기.
+`src/virtual_node.js` — Virtual DOM 노드 정의, 트리 비교, DOM → Virtual DOM 변환, 안전하지 않은 요소와 attribute 걸러내기 (URL attribute를 바꾸는 SVG 애니메이션 포함).
 
 노드 구조 (`plan.md` 4절을 이름 규칙에 맞춰 적용):
 
@@ -38,6 +38,7 @@
 | EC-017 | 문서에서 분리된 노드 | 정상 변환 | EC-017 문서에 붙지 않은(분리된) 노드도 변환된다 | 통과 |
 | EC-018 | 변환 중 live `childNodes`가 바뀜 | 먼저 `Array.from`으로 복사하고 순회해 시작 시점의 자식을 모두 변환 | EC-018 변환 중 live childNodes가 바뀌어도 시작 시점의 자식을 모두 변환한다 | 통과 |
 | EC-019 | 깊은 중첩 | 3000단계까지 `RangeError` 없이 변환. 재귀 구현이라 한계가 있으며 실측값은 Node 26 약 5000단계, Chrome 156 6000~8000단계 사이(2026-11-11). 브라우저 HTML 파서가 중첩을 512단계로 자르므로(Chrome에서 2000단계 입력 → 512단계 확인) 테스트 영역 입력으로는 한계에 닿지 않음 | EC-019 HTML 파서 중첩 제한(512단계)보다 충분히 깊은 3000단계도 RangeError 없이 변환한다 | 통과 |
+| EC-020 | SVG `animate`·`set`의 `attributeName`이 URL attribute(`href`, `xlink:href` 등, 대소문자·공백 포함) | 요소째 변환에서 제외. `values`/`to` 값으로 href를 `javascript:` URL로 바꿀 수 있기 때문 (값이 안전해도 제외). 다른 attribute를 바꾸는 애니메이션은 유지 | EC-020 URL attribute를 바꾸는 SVG animate와 set 요소는 변환에서 제외하고 다른 애니메이션은 남긴다 | 통과 |
 
 ## 유닛 테스트
 
@@ -62,6 +63,7 @@
 | EC-017 문서에 붙지 않은(분리된) 노드도 변환된다 | 분리된 노드 | EC-017 |
 | EC-018 변환 중 live childNodes가 바뀌어도 시작 시점의 자식을 모두 변환한다 | 순회 중 live 컬렉션 변경 (`Array.from`을 빼면 실패함을 확인) | EC-018 |
 | EC-019 HTML 파서 중첩 제한(512단계)보다 충분히 깊은 3000단계도 RangeError 없이 변환한다 | 깊은 중첩 여유 | EC-019 |
+| EC-020 URL attribute를 바꾸는 SVG animate와 set 요소는 변환에서 제외하고 다른 애니메이션은 남긴다 | 애니메이션을 통한 XSS 차단 | EC-020 |
 
 ## 미검증 항목
 
@@ -73,3 +75,4 @@
 | `iframe` 안 문서의 노드 변환 | 대역에 다른 문서(realm)를 만들지 않음 | 확인함. 같은 출처 iframe의 `contentDocument`에서 만든 요소(바깥 `HTMLElement`의 인스턴스가 아님)도 type, key, 텍스트, SVG 네임스페이스가 정상 변환됨. `nodeType` 숫자로 판별하므로 realm과 무관 |
 | Shadow DOM | `childNodes`는 shadow root를 포함하지 않음 | 확인함. open shadow root가 붙은 요소는 light DOM 자식(`span`)만 변환되고 shadow 트리(`i`)는 빠짐 (의도된 동작) |
 | 네임스페이스가 있는 attribute (`xlink:href`) | 이름 문자열로만 저장하고 `setAttribute`로 다시 만듦 | **문제 확인.** 변환 결과에는 `xlink:href`가 남지만, `setAttribute('xlink:href', ...)`로 다시 만들면 네임스페이스가 `null`인 일반 attribute가 되어 `<use>`가 대상을 참조하지 못함(`getBBox` 20×30 → 0×0). `href`를 함께 쓰거나 `href`만 쓰면 영향 없음. 수정 전까지 알려진 한계 |
+| SVG 애니메이션을 통한 `javascript:` URL | 대역은 SMIL 애니메이션을 실행하지 않음 | 2026-11-11 Chrome에서 확인: 수정 전 `<animate attributeName="href" values="javascript:...">`가 필터를 통과해 링크의 `href.animVal`이 `javascript:` URL이 됨. 수정 후 `animate`·`set`(href 대상)은 빠지고 `opacity` 애니메이션만 남으며 `animVal`은 빈 값 |
