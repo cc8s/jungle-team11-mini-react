@@ -135,7 +135,7 @@ Phase 2 예제 앱은 곡 객체와 행 조건이 같으면 이전 렌더링의 
 </p>
 
 ```
-  HTML 문자열 → Virtual DOM → diff_trees(이전 트리, 새 트리) → 연산 목록 → apply_operations → 실제 DOM
+  HTML → Virtual DOM → Diff → Patch → 실제 DOM
 ```
 
 - **Virtual DOM** — 모든 노드는 `Object.freeze`로 동결한 순수 데이터이고, 바뀌면 새 노드를 만듭니다. `id`가 있으면 key로 씁니다. 텍스트도 객체입니다(북마크로 쓰는 `WeakMap`은 객체만 키로 받습니다).
@@ -329,7 +329,7 @@ AI(Claude Code)를 코드 생성기가 아니라 **규칙을 지키는 페어 �
 
 ## 벤치마크
 
-Phase 2 예제 앱을 같은 DOM이 나오도록 React 18(production 빌드)로 옮겨 비교했습니다. React를 쓰는 코드라 [`CLAUDE.md`](CLAUDE.md)의 의존성 규칙에 따라 이 레포 밖에서 측정했고, 측정 전에 두 쪽이 같은 동작에서 같은 DOM을 만드는지 확인했습니다. 환경은 macOS, Chrome 156입니다. 시간은 환경에 따라 달라지는 참고값이고, 연산 수와 DOM 변경 횟수는 환경과 무관한 값입니다.
+Phase 2 페이지를 기준으로 React 18과 비교했습니다. 측정 전에 두 쪽이 같은 동작에서 같은 DOM을 만드는지 확인했습니다. 환경은 macOS, Chrome 156입니다. 시간은 환경에 따라 달라지는 참고값이고, 연산 수와 DOM 변경 횟수는 환경과 무관한 값입니다.
 
 ### 북마크 있음 / 없음 (둘 다 행 재사용)
 
