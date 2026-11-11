@@ -107,6 +107,9 @@ function diff_attributes(old_node, new_node, operations) {
 
 // 연산 적용 순서: 제거 → (교체, 추가, 이동을 새 index 오름차순으로) → 짝지어진 자식 재귀.
 // 이동 여부는 "제거 후 남은 순서"를 그대로 흉내 내며 판단하므로 patch 결과와 개수가 일치한다.
+// ADD와 MOVE에는 새 순서에서 바로 앞에 오는 형제(previous_node, 맨 앞이면 null)를 싣는다.
+// index 오름차순으로 적용하므로 앞 형제는 이미 제자리에 있고, patch는 그 형제의 DOM 바로 뒤에 넣는다.
+// 넣을 자리를 childNodes[index]로 세지 않으므로 외부 코드가 부모에 노드를 끼워 넣어도 순서가 밀리지 않는다.
 function diff_children(old_parent, new_parent, operations) {
   const old_children = old_parent.children;
   const new_children = new_parent.children;
@@ -135,13 +138,15 @@ function diff_children(old_parent, new_parent, operations) {
       simulated_order[simulated_order.indexOf(replaced_old_child)] = new_child;
       positioned_node = new_child;
     } else {
-      operations.push({ kind: operation_kinds.add, parent_node: old_parent, new_node: new_child, index });
+      const previous_node = index > 0 ? simulated_order[index - 1] : null;
+      operations.push({ kind: operation_kinds.add, parent_node: old_parent, new_node: new_child, index, previous_node });
       simulated_order.splice(index, 0, new_child);
       return;
     }
 
     if (simulated_order[index] !== positioned_node) {
-      operations.push({ kind: operation_kinds.move, parent_node: old_parent, node: positioned_node, index });
+      const previous_node = index > 0 ? simulated_order[index - 1] : null;
+      operations.push({ kind: operation_kinds.move, parent_node: old_parent, node: positioned_node, index, previous_node });
       simulated_order.splice(simulated_order.indexOf(positioned_node), 1);
       simulated_order.splice(index, 0, positioned_node);
     }

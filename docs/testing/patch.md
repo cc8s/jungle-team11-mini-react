@@ -42,6 +42,9 @@
 | EC-016 | 이미 문서에서 분리된 노드를 `REMOVE` / `REPLACE` | `REMOVE`는 `parentNode`가 없으면 제거를 건너뛰고 북마크는 해제. `REPLACE`는 새 노드를 넣을 자리가 없으므로 오류 | EC-016 이미 문서에서 분리된 노드를 REMOVE하면 건너뛰고 북마크는 해제하며, REPLACE는 오류다 | 통과 |
 | EC-017 | patch 중 `MutationObserver` 콜백 | 콜백은 microtask로 patch가 끝난 뒤 한 번 실행되므로 patch 도중 재진입이 없음 | 없음 (대역에 MutationObserver 없음, 2026-11-11 Chrome 156에서 확인: `apply_operations` 동안 호출 0번, 끝난 뒤 microtask에서 1번, 기록 5개, 콜백 시점의 DOM은 patch가 모두 끝난 상태) | 통과 |
 | EC-024 | 사용자가 고친 `input`과 고치지 않은 `input`의 `value` attribute 변경 | 같은 input DOM의 attribute만 바뀐다. 고치지 않았으면 화면 값도 바뀌고, 고쳤으면(dirty value) 사용자 입력이 남는다 (HTML 표준) | EC-024 input의 value attribute 변경은 사용자가 고치지 않은 input에만 화면 값으로 보인다 (dirty value) | 통과 |
+| EC-025 | 외부 코드(확장 프로그램, 위젯 스크립트 등)가 관리하는 부모 맨 앞에 노드를 끼워 넣은 뒤 `MOVE` | 넣을 자리를 `childNodes[index]`로 세지 않고, diff가 실은 앞 형제(`previous_node`)의 DOM을 북마크로 찾아 그 바로 뒤에 넣는다. 관리하는 노드 순서가 새 트리와 같고 끼워 넣은 노드는 그대로 남는다 | EC-025 외부 코드가 부모 맨 앞에 노드를 끼워 넣어도 MOVE는 관리하는 노드의 순서를 지킨다 | 통과 |
+| EC-026 | 같은 상황에서 가운데·맨 앞 `ADD` | 앞 형제 바로 뒤(맨 앞이면 부모의 첫 자식 앞)에 넣어 관리하는 노드 순서가 새 트리와 같다 | EC-026 외부 코드가 부모 맨 앞에 노드를 끼워 넣어도 ADD는 새 노드를 이전 형제 바로 뒤에 넣는다 | 통과 |
+| EC-027 | 무작위 트리 300쌍, 관리하는 요소 아무 곳(컨테이너 포함)에 외부 노드 하나 | 끼워 넣은 노드를 빼고 본 DOM의 모양과 순서가 새 트리와 같다. 수정 전 코드에서는 실패한다 | EC-027 무작위 트리 300쌍: 관리하는 요소 아무 곳에 외부 노드를 끼워 넣어도 patch 뒤 관리하는 노드의 모양과 순서가 새 트리와 같다 | 통과 |
 
 ## 유닛 테스트
 
@@ -70,6 +73,9 @@
 | EC-023 왕복: 파서처럼 네임스페이스를 붙인 DOM → Virtual DOM → patch로 만든 DOM의 attribute가 같다 | 파서와 같은 DOM | EC-023 |
 | EC-016 이미 문서에서 분리된 노드를 REMOVE하면 건너뛰고 북마크는 해제하며, REPLACE는 오류다 | 분리된 노드 | EC-016 |
 | EC-024 input의 value attribute 변경은 사용자가 고치지 않은 input에만 화면 값으로 보인다 (dirty value) | attribute와 property 차이 | EC-024 |
+| EC-025 외부 코드가 부모 맨 앞에 노드를 끼워 넣어도 MOVE는 관리하는 노드의 순서를 지킨다 | 외부 노드와 MOVE 위치 | EC-025 |
+| EC-026 외부 코드가 부모 맨 앞에 노드를 끼워 넣어도 ADD는 새 노드를 이전 형제 바로 뒤에 넣는다 | 외부 노드와 ADD 위치 | EC-026 |
+| EC-027 무작위 트리 300쌍: 관리하는 요소 아무 곳에 외부 노드를 끼워 넣어도 patch 뒤 관리하는 노드의 모양과 순서가 새 트리와 같다 | 외부 노드와 무작위 patch | EC-027 |
 
 ## 미검증 항목
 
@@ -81,3 +87,4 @@
 | 레이아웃, 렌더링 결과 | 대역은 렌더링하지 않음 | 브라우저 화면 확인 / **Playwright MCP 2차 검증 (2026-11-11, Chromium 157)**: 1440×900, 1440×660, 1024×768, 375×812에서 Phase 1 실제 영역이 patch 결과대로 그려지고 넘침·가로 스크롤 없음 (`app.md` EC-011 ~ EC-018) |
 | `xlink:href`로 참조하는 SVG `<use>` 렌더링 | 대역은 렌더링하지 않음 | 2026-11-11 Chrome 156에서 확인: mount와 `ATTRIBUTES` 연산 모두 `getBBox` 20×30 (수정 전 0×0) / **Playwright MCP 2차 검증 (2026-11-11, Chromium 157)**: mount 직후 `getBBox` 20×30, `xlink:href`를 다른 `rect`로 바꾸는 `ATTRIBUTES` 뒤에도 20×30 |
 | `iframe`, Shadow DOM 안의 컨테이너 | 대역에 해당 환경 없음 | 2026-11-11 Chrome 156에서 확인: iframe 안의 컨테이너에 iframe 문서를 넘겨도, 바깥 문서를 넘겨도(삽입 때 노드가 iframe 문서로 옮겨짐) mount와 patch 결과가 같고 key 있는 행 DOM을 재사용. shadow root 안의 요소와 shadow root 자체를 컨테이너로 써도 같은 결과 / **Playwright MCP 2차 검증 (2026-11-11, Chromium 157)**: iframe 문서를 넘긴 경우, 바깥 문서를 넘긴 경우, shadow 안 요소, shadow root 자체 모두 결과가 같고 key 있는 `li` DOM 재사용, 노드 `ownerDocument`가 컨테이너 문서 |
+| 외부 코드가 끼워 넣은 노드가 있을 때 실제 브라우저의 클릭·patch (EC-025 ~ EC-027) | 대역은 이벤트 dispatch와 DOM 순서를 흉내 낼 뿐 실제 브라우저가 아님 | **내장 브라우저(Chromium, Chrome 156) 확인 (2026-11-12, Playwright MCP 아님)**: Phase 2 예제 앱의 곡 목록(`ul`) 맨 앞에 `<aside>`를 넣고 실제 클릭. 수정 전: song_2 별 클릭은 맞는 곡을 고쳤지만, song_2 "아래로"는 State는 맞고 화면 순서만 song_3, song_1, song_2로 틀림. 수정 후: 별 클릭과 "아래로" 모두 State와 화면이 기대와 같음(song_1, song_3, song_2). 비교용으로 북마크 없이 위치(자식 index)로 찾는 변형은 같은 상황에서 엉뚱한 곡(song_3)의 핸들러를 부르고 다른 곡의 DOM을 고쳤다 |
