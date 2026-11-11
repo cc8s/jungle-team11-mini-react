@@ -402,3 +402,38 @@ test('EC-023 왕복: 파서처럼 네임스페이스를 붙인 DOM → Virtual D
     assert.deepEqual(describe_attributes(patched_elements[index]), describe_attributes(source_element));
   });
 });
+
+test('EC-016 이미 문서에서 분리된 노드를 REMOVE하면 건너뛰고 북마크는 해제하며, REPLACE는 오류다', () => {
+  const first_tree = fragment_node([element_node('p', { id: 'first' }, [text_node('a')]), element_node('p', { id: 'second' })]);
+  const removed_tree = fragment_node([element_node('p', { id: 'second' })]);
+  const environment = create_environment(first_tree);
+  const first_dom_node = environment.container_element.childNodes[0];
+  environment.container_element.removeChild(first_dom_node);
+  assert.doesNotThrow(() => patch_to(environment, first_tree, removed_tree));
+  assert.equal(find_virtual_node(first_dom_node), null);
+  assert.equal(environment.container_element.childNodes.length, 1);
+
+  const replace_old_tree = fragment_node([element_node('p', null, [text_node('old')])]);
+  const replace_new_tree = fragment_node([element_node('div', null, [text_node('new')])]);
+  const replace_environment = create_environment(replace_old_tree);
+  const old_dom_node = replace_environment.container_element.childNodes[0];
+  replace_environment.container_element.removeChild(old_dom_node);
+  assert.throws(() => patch_to(replace_environment, replace_old_tree, replace_new_tree), /분리/);
+});
+
+test('EC-024 input의 value attribute 변경은 사용자가 고치지 않은 input에만 화면 값으로 보인다 (dirty value)', () => {
+  const old_tree = fragment_node([element_node('input', { id: 'memo', value: '처음' })]);
+  const new_tree = fragment_node([element_node('input', { id: 'memo', value: '바뀜' })]);
+  const clean_environment = create_environment(old_tree);
+  const clean_input = clean_environment.container_element.childNodes[0];
+  patch_to(clean_environment, old_tree, new_tree);
+  assert.equal(clean_input.value, '바뀜');
+
+  const dirty_environment = create_environment(old_tree);
+  const dirty_input = dirty_environment.container_element.childNodes[0];
+  dirty_input.value = '사용자 입력';
+  patch_to(dirty_environment, old_tree, new_tree);
+  assert.equal(dirty_environment.container_element.childNodes[0] === dirty_input, true, '같은 input DOM');
+  assert.equal(dirty_input.getAttribute('value'), '바뀜');
+  assert.equal(dirty_input.value, '사용자 입력');
+});

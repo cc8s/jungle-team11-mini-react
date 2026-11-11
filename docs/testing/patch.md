@@ -39,8 +39,9 @@
 | EC-021 | SVG 요소를 만들 때 `xlink:href`, HTML 요소의 `xlink:href` | SVG는 xlink 네임스페이스(prefix `xlink`, localName `href`), HTML은 네임스페이스 없음 | EC-021 SVG 요소를 만들 때 xlink:href는 xlink 네임스페이스 attribute가 되고 HTML 요소에서는 일반 attribute다 | 통과 |
 | EC-022 | `ATTRIBUTES` 연산으로 `xlink:href` 추가, 값 변경, 제거 | 네임스페이스와 함께 추가, 변경해도 attribute는 하나, 제거 후 남지 않음 | EC-022 ATTRIBUTES 연산은 xlink:href를 네임스페이스와 함께 추가하고, 값 변경과 제거도 같은 attribute 하나에 적용한다 | 통과 |
 | EC-023 | 파서처럼 네임스페이스가 붙은 DOM → Virtual DOM → patch 왕복 | attribute의 네임스페이스, prefix, localName, 값이 원래 DOM과 같음 | EC-023 왕복: 파서처럼 네임스페이스를 붙인 DOM → Virtual DOM → patch로 만든 DOM의 attribute가 같다 | 통과 |
-| EC-016 | 이미 문서에서 분리된 노드를 `REMOVE` | `parentNode`가 없으면 제거를 건너뜀 | 없음 | 미검증 |
-| EC-017 | patch 중 `MutationObserver` 콜백 | 콜백은 microtask로 patch가 끝난 뒤 실행되므로 patch 도중 재진입이 없음 | 없음 (대역에 MutationObserver 없음) | 미검증 |
+| EC-016 | 이미 문서에서 분리된 노드를 `REMOVE` / `REPLACE` | `REMOVE`는 `parentNode`가 없으면 제거를 건너뛰고 북마크는 해제. `REPLACE`는 새 노드를 넣을 자리가 없으므로 오류 | EC-016 이미 문서에서 분리된 노드를 REMOVE하면 건너뛰고 북마크는 해제하며, REPLACE는 오류다 | 통과 |
+| EC-017 | patch 중 `MutationObserver` 콜백 | 콜백은 microtask로 patch가 끝난 뒤 한 번 실행되므로 patch 도중 재진입이 없음 | 없음 (대역에 MutationObserver 없음, 2026-11-11 Chrome 156에서 확인: `apply_operations` 동안 호출 0번, 끝난 뒤 microtask에서 1번, 기록 5개, 콜백 시점의 DOM은 patch가 모두 끝난 상태) | 통과 |
+| EC-024 | 사용자가 고친 `input`과 고치지 않은 `input`의 `value` attribute 변경 | 같은 input DOM의 attribute만 바뀐다. 고치지 않았으면 화면 값도 바뀌고, 고쳤으면(dirty value) 사용자 입력이 남는다 (HTML 표준) | EC-024 input의 value attribute 변경은 사용자가 고치지 않은 input에만 화면 값으로 보인다 (dirty value) | 통과 |
 
 ## 유닛 테스트
 
@@ -67,14 +68,16 @@
 | EC-021 SVG 요소를 만들 때 xlink:href는 xlink 네임스페이스 attribute가 되고 HTML 요소에서는 일반 attribute다 | 생성 시 attribute 네임스페이스 | EC-021 |
 | EC-022 ATTRIBUTES 연산은 xlink:href를 네임스페이스와 함께 추가하고, 값 변경과 제거도 같은 attribute 하나에 적용한다 | 연산 적용 시 attribute 네임스페이스 | EC-022 |
 | EC-023 왕복: 파서처럼 네임스페이스를 붙인 DOM → Virtual DOM → patch로 만든 DOM의 attribute가 같다 | 파서와 같은 DOM | EC-023 |
+| EC-016 이미 문서에서 분리된 노드를 REMOVE하면 건너뛰고 북마크는 해제하며, REPLACE는 오류다 | 분리된 노드 | EC-016 |
+| EC-024 input의 value attribute 변경은 사용자가 고치지 않은 input에만 화면 값으로 보인다 (dirty value) | attribute와 property 차이 | EC-024 |
 
 ## 미검증 항목
 
-| 항목 | 이유 | 필요한 검증 방법 |
+| 항목 | 이유 | 검증 방법과 결과 |
 | --- | --- | --- |
 | 포커스와 선택 영역 보존 | 대역에 포커스 개념이 없음 | 브라우저에서 메모 입력란에 포커스를 두고 Ctrl/⌘+Enter로 Patch. 2026-11-10 수동 확인: Patch와 뒤로가기 뒤에도 같은 `input` 노드와 입력값 유지 |
 | 바뀐 노드 하이라이트 | Web Animations API(`element.animate`)는 대역에 없음 | 브라우저에서 Patch 후 테두리 애니메이션 확인. 2026-11-10 수동 확인 |
-| `input`의 `value` attribute 변경 | 사용자가 이미 입력한 input은 attribute를 바꿔도 화면 값이 바뀌지 않음 (DOM 표준의 dirty value 동작) | 브라우저에서 입력 후 테스트 영역의 `value` attribute를 바꿔 확인 |
+| `input`의 `value` attribute 변경 | 사용자가 이미 입력한 input은 attribute를 바꿔도 화면 값이 바뀌지 않음 (DOM 표준의 dirty value 동작) | 대역은 EC-024로 확인. 2026-11-11 Chrome 156에서도 확인: 고치지 않은 input은 화면 값이 "바뀜", 사용자가 입력한 input은 같은 DOM에서 attribute만 "바뀜"이고 화면 값은 "사용자 입력" 유지 |
 | 레이아웃, 렌더링 결과 | 대역은 렌더링하지 않음 | 브라우저 화면 확인 |
 | `xlink:href`로 참조하는 SVG `<use>` 렌더링 | 대역은 렌더링하지 않음 | 2026-11-11 Chrome 156에서 확인: mount와 `ATTRIBUTES` 연산 모두 `getBBox` 20×30 (수정 전 0×0) |
-| `iframe`, Shadow DOM 안의 컨테이너 | 대역에 해당 환경 없음 | 브라우저에서 해당 환경에 mount해 확인 |
+| `iframe`, Shadow DOM 안의 컨테이너 | 대역에 해당 환경 없음 | 2026-11-11 Chrome 156에서 확인: iframe 안의 컨테이너에 iframe 문서를 넘겨도, 바깥 문서를 넘겨도(삽입 때 노드가 iframe 문서로 옮겨짐) mount와 patch 결과가 같고 key 있는 행 DOM을 재사용. shadow root 안의 요소와 shadow root 자체를 컨테이너로 써도 같은 결과 |
