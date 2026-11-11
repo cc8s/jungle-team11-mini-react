@@ -384,3 +384,68 @@ test('EC-020 즐겨찾기 별은 행 맨 앞(커버 왼쪽)에 있고 메인 버
   assert.ok(has_class('main_song_button')(action_buttons[0]));
   assert.equal(find_all_elements(find_element(row_dom, has_class('song_actions')), (element_node) => element_node.getAttribute('aria-label') === '즐겨찾기').length, 0);
 });
+
+test('EC-018 한 동작에서 State 여러 개를 바꿔도 update는 한 번이다 (메인곡 삭제, 즐겨찾기 필터에서 곡 추가)', async () => {
+  const board = mount_board();
+  const { container_element } = board;
+  const render_count_before_remove = board.render_reports.length;
+  click(find_row_button(find_row(container_element, 'song_1'), '삭제'));
+  await wait_for_scheduled_update();
+  assert.equal(board.render_reports.length, render_count_before_remove + 1);
+  assert.deepEqual(board.action_labels.slice(-1), ['곡 삭제 · 새벽 산책']);
+  assert.equal(board.saved_boards.at(-1).main_song_id, null);
+  assert.equal(board.saved_boards.at(-1).songs.length, 2);
+
+  click(find_all_elements(container_element, has_class('segment_button'))[1]);
+  await wait_for_scheduled_update();
+  const render_count_before_add = board.render_reports.length;
+  submit(fill_add_form(container_element, { song_title: '새 곡', song_artist: '새 가수' }));
+  await wait_for_scheduled_update();
+  assert.equal(board.render_reports.length, render_count_before_add + 1);
+  const saved_board = board.saved_boards.at(-1);
+  assert.equal(saved_board.filter_name, 'all');
+  assert.equal(saved_board.songs.length, 3);
+  assert.ok(list_row_ids(container_element).includes(`row_${saved_board.songs.at(-1).id}`));
+});
+
+test('EC-017 필터를 바꿔 수정 중인 곡이 가려지면 수정이 취소되고, 다시 보여도 폼이 되살아나지 않는다', async () => {
+  const board = mount_board();
+  const { container_element } = board;
+  const segment_buttons = () => find_all_elements(container_element, has_class('segment_button'));
+  const editing_row = find_row(container_element, 'song_2');
+  click(find_row_button(editing_row, '수정'));
+  await wait_for_scheduled_update();
+  assert.deepEqual(
+    find_all_elements(editing_row, (element_node) => element_node.localName === 'button').map((button) => button.textContent),
+    ['취소', '저장'],
+    '수정 중인 행에는 즐겨찾기·삭제 버튼이 없다',
+  );
+  find_element(editing_row, has_id('edit_song_2_title')).value = '바꾼 제목';
+
+  const render_count_before_filter = board.render_reports.length;
+  click(segment_buttons()[1]);
+  await wait_for_scheduled_update();
+  assert.equal(board.render_reports.length, render_count_before_filter + 1);
+  assert.deepEqual(list_row_ids(container_element), ['row_song_1', 'row_song_3']);
+
+  click(segment_buttons()[0]);
+  await wait_for_scheduled_update();
+  const shown_row = find_row(container_element, 'song_2');
+  assert.equal(find_element(container_element, has_class('song_edit_form')) === null, true, '수정 폼이 되살아나면 안 된다');
+  assert.equal(find_element(shown_row, has_class('song_title'))?.textContent, 'Paper Lantern');
+});
+
+test('EC-017 필터를 바꿔도 수정 중인 곡이 계속 보이면 수정 폼과 입력값이 그대로다', async () => {
+  const board = mount_board();
+  const { container_element } = board;
+  const segment_buttons = () => find_all_elements(container_element, has_class('segment_button'));
+  const editing_row = find_row(container_element, 'song_1');
+  click(find_row_button(editing_row, '수정'));
+  await wait_for_scheduled_update();
+  const title_input = find_element(editing_row, has_id('edit_song_1_title'));
+  title_input.value = '바꾸는 중';
+  click(segment_buttons()[1]);
+  await wait_for_scheduled_update();
+  assert.equal(find_element(container_element, has_id('edit_song_1_title')) === title_input, true, '같은 input DOM이어야 한다');
+  assert.equal(title_input.value, '바꾸는 중');
+});

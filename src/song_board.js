@@ -500,6 +500,14 @@ export function song_board_root(props) {
   const handle_filter_change = (next_filter_name) => {
     if (next_filter_name === filter_name) return;
     set_filter_name(next_filter_name);
+    // 수정 중인 곡이 새 필터에서 가려지면 폼 DOM이 사라지며 입력도 함께 버려진다.
+    // 수정 상태를 남겨 두면 나중에 다시 보일 때 원래 값의 폼이 말없이 되살아나므로, 취소 버튼과 같게 끝낸다.
+    const is_editing_song_hidden =
+      editing_song_id !== null && !filter_songs(songs, next_filter_name).some((song) => song.id === editing_song_id);
+    if (is_editing_song_hidden) {
+      set_editing_song_id(null);
+      set_edit_error_text('');
+    }
     report_action(next_filter_name === filter_names.favorite ? '필터 · 즐겨찾기' : '필터 · 전체');
   };
 
