@@ -36,8 +36,8 @@
 | EC-015 | 컨테이너 변환, 컨테이너가 `null` | 내용만 `#fragment`로, `null`이면 `TypeError` | EC-015 create_root_from_container는 컨테이너의 내용만 #fragment로 만든다 | 통과 |
 | EC-016 | children에 노드가 아닌 값, 배열이 아닌 children, 객체가 아닌 attributes | `TypeError` | EC-016 children에 Virtual DOM 노드가 아닌 값이 있으면 TypeError | 통과 |
 | EC-017 | 문서에서 분리된 노드 | 정상 변환 | EC-017 문서에 붙지 않은(분리된) 노드도 변환된다 | 통과 |
-| EC-018 | 변환 중 live `childNodes`가 바뀜 | 먼저 `Array.from`으로 복사하고 순회 | (코드 구조로 보장, 변환 중 DOM을 바꾸는 경로가 없음) | 미검증 |
-| EC-019 | 중첩이 약 1500단계를 넘음 | 재귀 구현이라 `RangeError`가 날 수 있음. 브라우저 HTML 파서가 중첩을 512단계로 제한하므로 테스트 영역 입력으로는 생기지 않음 | 없음 (알려진 한계) | 미검증 |
+| EC-018 | 변환 중 live `childNodes`가 바뀜 | 먼저 `Array.from`으로 복사하고 순회해 시작 시점의 자식을 모두 변환 | EC-018 변환 중 live childNodes가 바뀌어도 시작 시점의 자식을 모두 변환한다 | 통과 |
+| EC-019 | 깊은 중첩 | 3000단계까지 `RangeError` 없이 변환. 재귀 구현이라 한계가 있으며 실측값은 Node 26 약 5000단계, Chrome 156 6000~8000단계 사이(2026-11-11). 브라우저 HTML 파서가 중첩을 512단계로 자르므로(Chrome에서 2000단계 입력 → 512단계 확인) 테스트 영역 입력으로는 한계에 닿지 않음 | EC-019 HTML 파서 중첩 제한(512단계)보다 충분히 깊은 3000단계도 RangeError 없이 변환한다 | 통과 |
 
 ## 유닛 테스트
 
@@ -60,12 +60,16 @@
 | EC-015 create_root_from_container는 컨테이너의 내용만 #fragment로 만든다 | 루트 변환 | EC-015 |
 | EC-016 children에 Virtual DOM 노드가 아닌 값이 있으면 TypeError | 입력 검증 | EC-016 |
 | EC-017 문서에 붙지 않은(분리된) 노드도 변환된다 | 분리된 노드 | EC-017 |
+| EC-018 변환 중 live childNodes가 바뀌어도 시작 시점의 자식을 모두 변환한다 | 순회 중 live 컬렉션 변경 (`Array.from`을 빼면 실패함을 확인) | EC-018 |
+| EC-019 HTML 파서 중첩 제한(512단계)보다 충분히 깊은 3000단계도 RangeError 없이 변환한다 | 깊은 중첩 여유 | EC-019 |
 
 ## 미검증 항목
 
-| 항목 | 이유 | 필요한 검증 방법 |
+대역으로 확인할 수 없는 항목은 2026-11-11 Chrome 156 계열 브라우저(검증 페이지 `localhost:4173`)에서 실제 DOM으로 확인했다.
+
+| 항목 | 이유 | 브라우저 확인 결과 |
 | --- | --- | --- |
-| 실제 브라우저 DOM의 `attributes`(NamedNodeMap), `localName`, `namespaceURI` 값 | 테스트 대역은 표준을 흉내 낼 뿐 실제 구현이 아님 | 브라우저에서 페이지를 열어 초기 변환 결과(현재 Virtual DOM 패널)를 확인. 2026-11-10 Chrome 계열 브라우저 패널에서 수동 확인 |
-| `iframe` 안 문서의 노드 변환 | 대역에 다른 문서(realm)를 만들지 않음 | 같은 출처 iframe의 `contentDocument` 노드를 넣어 브라우저에서 확인 |
-| Shadow DOM | `childNodes`는 shadow root를 포함하지 않으므로 shadow 트리는 변환되지 않음 (의도된 동작) | shadow root가 붙은 요소로 브라우저 확인 |
-| 네임스페이스가 있는 attribute (`xlink:href`) | 이름 문자열로만 저장하고 `setAttribute`로 다시 만들므로 네임스페이스는 사라짐 | SVG `use`에 `xlink:href`를 넣어 브라우저에서 렌더링 확인 |
+| 실제 브라우저 DOM의 `attributes`(NamedNodeMap), `localName`, `namespaceURI` 값 | 테스트 대역은 표준을 흉내 낼 뿐 실제 구현이 아님 | 확인함. `innerHTML`로 만든 `<svg viewBox>` → `type: svg`, SVG 네임스페이스, `viewBox` 대소문자 유지, 자식 `linearGradient` 유지. `<p onclick class>`는 `class`만 남음 |
+| `iframe` 안 문서의 노드 변환 | 대역에 다른 문서(realm)를 만들지 않음 | 확인함. 같은 출처 iframe의 `contentDocument`에서 만든 요소(바깥 `HTMLElement`의 인스턴스가 아님)도 type, key, 텍스트, SVG 네임스페이스가 정상 변환됨. `nodeType` 숫자로 판별하므로 realm과 무관 |
+| Shadow DOM | `childNodes`는 shadow root를 포함하지 않음 | 확인함. open shadow root가 붙은 요소는 light DOM 자식(`span`)만 변환되고 shadow 트리(`i`)는 빠짐 (의도된 동작) |
+| 네임스페이스가 있는 attribute (`xlink:href`) | 이름 문자열로만 저장하고 `setAttribute`로 다시 만듦 | **문제 확인.** 변환 결과에는 `xlink:href`가 남지만, `setAttribute('xlink:href', ...)`로 다시 만들면 네임스페이스가 `null`인 일반 attribute가 되어 `<use>`가 대상을 참조하지 못함(`getBBox` 20×30 → 0×0). `href`를 함께 쓰거나 `href`만 쓰면 영향 없음. 수정 전까지 알려진 한계 |

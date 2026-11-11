@@ -208,3 +208,40 @@ test('EC-017 문서에 붙지 않은(분리된) 노드도 변환된다', () => {
   assert.equal(detached_element.parentNode, null);
   assert.equal(create_virtual_node_from_dom(detached_element).children[0].text, '분리됨');
 });
+
+test('EC-018 변환 중 live childNodes가 바뀌어도 시작 시점의 자식을 모두 변환한다', () => {
+  const owner_document = new fake_document();
+  const container_element = build_element(owner_document, 'div', {}, ['첫째', '둘째', '셋째']);
+  const [first_text_node, second_text_node] = container_element.childNodes;
+  const first_text = first_text_node.data;
+  let is_sibling_removed = false;
+  // 첫 텍스트를 읽는 순간 다음 형제를 떼어 내 live 컬렉션을 순회 중에 줄인다.
+  Object.defineProperty(first_text_node, 'data', {
+    get() {
+      if (!is_sibling_removed) {
+        is_sibling_removed = true;
+        container_element.removeChild(second_text_node);
+      }
+      return first_text;
+    },
+  });
+  const container_node = create_virtual_node_from_dom(container_element);
+  assert.equal(container_element.childNodes.length, 2);
+  assert.deepEqual(
+    container_node.children.map((child_node) => child_node.text),
+    ['첫째', '둘째', '셋째'],
+  );
+});
+
+test('EC-019 HTML 파서 중첩 제한(512단계)보다 충분히 깊은 3000단계도 RangeError 없이 변환한다', () => {
+  const owner_document = new fake_document();
+  const root_element = owner_document.createElement('div');
+  let current_element = root_element;
+  for (let depth_index = 0; depth_index < 3000; depth_index += 1) {
+    const nested_element = owner_document.createElement('div');
+    current_element.appendChild(nested_element);
+    current_element = nested_element;
+  }
+  assert.doesNotThrow(() => create_virtual_node_from_dom(root_element));
+});
+
