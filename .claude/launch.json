@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "virtual_dom_page",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/serve_static.js"],
+      "port": 4173
+    }
+  ]
+}
