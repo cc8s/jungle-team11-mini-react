@@ -348,7 +348,7 @@ function song_collection(props) {
     songs.map((song, index) =>
       song.id === props.editing_song_id
         ? render_child_component(song_edit_row, { song, error_text: props.edit_error_text, song_actions: props.song_actions })
-        : render_child_component(song_row, {
+        : render_cached_song_row(props.row_cache, {
             song,
             is_main: song.id === main_song_id,
             can_move: props.can_move,
@@ -358,6 +358,33 @@ function song_collection(props) {
           }),
     ),
   );
+}
+
+// 곡 객체가 같고 행이 읽는 조건(is_main, can_move, is_first, is_last, song_actions)도 같으면
+// 이전 렌더링의 행 Virtual DOM 객체를 그대로 돌려준다. 노드가 불변이므로 같은 객체 = 같은 내용이다.
+// 북마크는 Virtual DOM 객체를 키로 DOM을 가리키므로, 객체가 같으면 북마크도 그대로 맞다.
+// 그래서 diff는 old === new에서 하위 트리를 건너뛰고, 그 행에는 BIND도 생기지 않는다.
+// 곡 데이터는 불변이라 바뀐 곡만 새 객체가 되고(song_board_model), 캐시는 곡 객체를 키로 한 WeakMap이라 지운 곡과 함께 해제된다.
+function render_cached_song_row(row_cache, row_props) {
+  const cached_entry = row_cache.get(row_props.song);
+  const is_reusable =
+    cached_entry !== undefined &&
+    cached_entry.is_main === row_props.is_main &&
+    cached_entry.can_move === row_props.can_move &&
+    cached_entry.is_first === row_props.is_first &&
+    cached_entry.is_last === row_props.is_last &&
+    cached_entry.song_actions === row_props.song_actions;
+  if (is_reusable) return cached_entry.row_node;
+  const row_node = render_child_component(song_row, row_props);
+  row_cache.set(row_props.song, {
+    is_main: row_props.is_main,
+    can_move: row_props.can_move,
+    is_first: row_props.is_first,
+    is_last: row_props.is_last,
+    song_actions: row_props.song_actions,
+    row_node,
+  });
+  return row_node;
 }
 
 // ---------- 루트 컴포넌트 (State와 Hook은 여기에만) ----------
@@ -440,25 +467,33 @@ export function song_board_root(props) {
     if (is_composing_enter(keyboard_event)) keyboard_event.preventDefault();
   };
 
-  const song_actions = Object.freeze({
+  // 재사용한 행은 처음 만들 때의 핸들러를 그대로 들고 있다.
+  // 그래서 song_actions는 렌더링마다 같은 객체로 두고, 렌더링 시점의 State를 닫아 두지 않도록
+  // updater 함수(현재 값을 받아 다음 값을 돌려줌)와 최신 State 상자로 계산한다.
+  const row_cache = use_memo(() => new WeakMap(), []);
+  const latest_state = use_memo(() => ({ songs: null, main_song_id: null }), []);
+  latest_state.songs = songs;
+  latest_state.main_song_id = main_song_id;
+
+  const song_actions = use_memo(() => Object.freeze({
     on_toggle_favorite: (song) => {
-      set_songs(toggle_favorite(songs, song.id));
+      set_songs((current_songs) => toggle_favorite(current_songs, song.id));
       report_action(`${song.is_favorite ? '즐겨찾기 해제' : '즐겨찾기'} · ${song.title}`);
     },
     // 같은 곡을 다시 지정하면 State가 그대로라 다시 그리지 않는다.
     on_set_main: (song) => {
-      if (song.id === main_song_id) return;
+      if (song.id === latest_state.main_song_id) return;
       set_main_song_id(song.id);
       report_action(`메인곡 지정 · ${song.title}`);
     },
     on_remove: (song) => {
-      set_songs(remove_song(songs, song.id));
-      if (song.id === main_song_id) set_main_song_id(null);
-      if (song.id === editing_song_id) set_editing_song_id(null);
+      set_songs((current_songs) => remove_song(current_songs, song.id));
+      set_main_song_id((current_main_song_id) => (current_main_song_id === song.id ? null : current_main_song_id));
+      set_editing_song_id((current_editing_song_id) => (current_editing_song_id === song.id ? null : current_editing_song_id));
       report_action(`곡 삭제 · ${song.title}`);
     },
     on_move: (song, move_offset) => {
-      set_songs(move_song(songs, song.id, move_offset));
+      set_songs((current_songs) => move_song(current_songs, song.id, move_offset));
       report_action(`순서 변경 · ${song.title}`);
     },
     on_start_edit: (song) => {
@@ -473,13 +508,13 @@ export function song_board_root(props) {
     },
     on_save_edit: (song, submit_event, form_element) => {
       submit_event.preventDefault();
-      const validation = validate_song_draft(read_song_draft(form_element), songs, song.id);
+      const validation = validate_song_draft(read_song_draft(form_element), latest_state.songs, song.id);
       if (!validation.is_valid) {
         set_edit_error_text(validation.error_text);
         report_action('곡 수정 실패');
         return;
       }
-      set_songs(update_song(songs, song.id, validation.song_fields));
+      set_songs((current_songs) => update_song(current_songs, song.id, validation.song_fields));
       set_editing_song_id(null);
       set_edit_error_text('');
       report_action(`곡 수정 · ${validation.song_fields.title}`);
@@ -495,7 +530,7 @@ export function song_board_root(props) {
         report_action('수정 취소');
       }
     },
-  });
+  }), []);
 
   const handle_filter_change = (next_filter_name) => {
     if (next_filter_name === filter_name) return;
@@ -548,6 +583,7 @@ export function song_board_root(props) {
         edit_error_text,
         can_move: filter_name === filter_names.all,
         song_actions,
+        row_cache,
       }),
     ]),
   ];

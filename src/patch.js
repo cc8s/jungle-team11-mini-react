@@ -52,6 +52,16 @@ function set_dom_attribute(element_dom_node, element_namespace, attribute_name, 
   else element_dom_node.setAttributeNS(attribute_namespace, attribute_name, attribute_value);
 }
 
+// ADD·MOVE로 넣을 자리의 기준 DOM(이 노드 앞에 넣는다)을 정한다.
+// diff가 실은 앞 형제(previous_node)가 있으면 북마크로 그 DOM을 찾아 바로 뒤에 넣고, 맨 앞이면 부모의 첫 자식 앞에 넣는다.
+// childNodes[index]로 세면 외부 코드가 부모에 끼워 넣은 노드만큼 자리가 밀려 순서가 틀어진다.
+// previous_node가 없는 연산(직접 만든 연산)은 예전처럼 index로 센다.
+function find_reference_dom_node(bookmark_registry, parent_dom_node, operation) {
+  if (!Object.hasOwn(operation, 'previous_node')) return parent_dom_node.childNodes[operation.index] ?? null;
+  if (operation.previous_node === null) return parent_dom_node.firstChild;
+  return find_dom_node(bookmark_registry, operation.previous_node).nextSibling;
+}
+
 function require_document(owner_document) {
   if (owner_document === null || owner_document === undefined || typeof owner_document.createElement !== 'function') {
     throw new TypeError('DOM 노드를 만들 document가 필요합니다');
@@ -175,15 +185,16 @@ export function apply_operations(bookmark_registry, operations, owner_document) 
       }
       case operation_kinds.add: {
         const parent_dom_node = find_dom_node(bookmark_registry, operation.parent_node);
+        const reference_dom_node = find_reference_dom_node(bookmark_registry, parent_dom_node, operation);
         const added_dom_node = create_dom_tree(bookmark_registry, operation.new_node, require_document(owner_document));
-        parent_dom_node.insertBefore(added_dom_node, parent_dom_node.childNodes[operation.index] ?? null);
+        parent_dom_node.insertBefore(added_dom_node, reference_dom_node);
         record_change(operation, added_dom_node);
         break;
       }
       case operation_kinds.move: {
         const parent_dom_node = find_dom_node(bookmark_registry, operation.parent_node);
         const moved_dom_node = find_dom_node(bookmark_registry, operation.node);
-        const reference_dom_node = parent_dom_node.childNodes[operation.index] ?? null;
+        const reference_dom_node = find_reference_dom_node(bookmark_registry, parent_dom_node, operation);
         if (reference_dom_node !== moved_dom_node) parent_dom_node.insertBefore(moved_dom_node, reference_dom_node);
         record_change(operation, moved_dom_node);
         break;

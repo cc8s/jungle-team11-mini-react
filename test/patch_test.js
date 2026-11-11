@@ -437,3 +437,75 @@ test('EC-024 input의 value attribute 변경은 사용자가 고치지 않은 in
   assert.equal(dirty_input.getAttribute('value'), '바뀜');
   assert.equal(dirty_input.value, '사용자 입력');
 });
+
+// 외부 코드(확장 프로그램, 위젯 스크립트 등)가 관리하는 부모 안에 끼워 넣은 노드를 흉내 낸다.
+function insert_foreign_node(environment, parent_dom_node) {
+  const foreign_dom_node = environment.owner_document.createElement('aside');
+  parent_dom_node.insertBefore(foreign_dom_node, parent_dom_node.firstChild);
+  return foreign_dom_node;
+}
+
+function list_managed_item_keys(list_dom_node) {
+  return Array.from(list_dom_node.childNodes)
+    .filter((child_dom_node) => child_dom_node.localName === 'li')
+    .map((item_dom_node) => item_dom_node.getAttribute('id'));
+}
+
+test('EC-025 외부 코드가 부모 맨 앞에 노드를 끼워 넣어도 MOVE는 관리하는 노드의 순서를 지킨다', () => {
+  const old_tree = list_tree(['a', 'b', 'c']);
+  const environment = create_environment(old_tree);
+  const list_dom_node = environment.container_element.childNodes[0];
+  const foreign_dom_node = insert_foreign_node(environment, list_dom_node);
+  patch_to(environment, old_tree, list_tree(['a', 'c', 'b']));
+  assert.deepEqual(list_managed_item_keys(list_dom_node), ['a', 'c', 'b']);
+  assert.equal(foreign_dom_node.parentNode, list_dom_node, '끼워 넣은 노드는 건드리지 않는다');
+});
+
+test('EC-026 외부 코드가 부모 맨 앞에 노드를 끼워 넣어도 ADD는 새 노드를 이전 형제 바로 뒤에 넣는다', () => {
+  const old_tree = list_tree(['a', 'b']);
+  const environment = create_environment(old_tree);
+  const list_dom_node = environment.container_element.childNodes[0];
+  const foreign_dom_node = insert_foreign_node(environment, list_dom_node);
+  const middle_tree = list_tree(['a', 'x', 'b']);
+  patch_to(environment, old_tree, middle_tree);
+  assert.deepEqual(list_managed_item_keys(list_dom_node), ['a', 'x', 'b']);
+  patch_to(environment, middle_tree, list_tree(['y', 'a', 'x', 'b']));
+  assert.deepEqual(list_managed_item_keys(list_dom_node), ['y', 'a', 'x', 'b'], '맨 앞 ADD');
+  assert.equal(foreign_dom_node.parentNode, list_dom_node);
+});
+
+// 외부 노드(aside)는 빼고, 관리하는 DOM이 Virtual DOM 트리와 같은 모양인지 비교한다.
+function is_managed_dom_same_as_tree(parent_dom_node, parent_virtual_node) {
+  const managed_dom_nodes = Array.from(parent_dom_node.childNodes).filter((child_dom_node) => child_dom_node.localName !== 'aside');
+  if (managed_dom_nodes.length !== parent_virtual_node.children.length) return false;
+  return parent_virtual_node.children.every((child_node, index) => {
+    const child_dom_node = managed_dom_nodes[index];
+    if (is_text_like_node(child_node)) return child_dom_node.data === child_node.text;
+    return child_dom_node.localName === child_node.type && is_managed_dom_same_as_tree(child_dom_node, child_node);
+  });
+}
+
+test('EC-027 무작위 트리 300쌍: 관리하는 요소 아무 곳에 외부 노드를 끼워 넣어도 patch 뒤 관리하는 노드의 모양과 순서가 새 트리와 같다', () => {
+  const next_random = create_seeded_random(20261112);
+  for (let round_index = 0; round_index < 300; round_index += 1) {
+    const old_tree = fragment_node(create_random_children(next_random, 3));
+    const new_tree = fragment_node(create_random_children(next_random, 3));
+    const environment = create_environment(old_tree);
+    const element_dom_nodes = [environment.container_element];
+    const pending_dom_nodes = [...environment.container_element.childNodes];
+    while (pending_dom_nodes.length > 0) {
+      const current_dom_node = pending_dom_nodes.pop();
+      if (current_dom_node.nodeType !== 1) continue;
+      element_dom_nodes.push(current_dom_node);
+      pending_dom_nodes.push(...current_dom_node.childNodes);
+    }
+    const target_dom_node = pick_random(next_random, element_dom_nodes);
+    const insert_index = Math.floor(next_random() * (target_dom_node.childNodes.length + 1));
+    target_dom_node.insertBefore(
+      environment.owner_document.createElement('aside'),
+      target_dom_node.childNodes[insert_index] ?? null,
+    );
+    patch_to(environment, old_tree, new_tree);
+    assert.ok(is_managed_dom_same_as_tree(environment.container_element, new_tree), `round ${round_index}`);
+  }
+});
