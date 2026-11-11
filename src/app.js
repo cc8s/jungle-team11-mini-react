@@ -63,6 +63,8 @@ const bookmark_registry = create_bookmark_registry();
 const entry_details_by_id = new Map();
 let state_history = null;
 let is_test_area_dirty = false;
+// 테스트 영역에 마지막으로 그린 HTML. 입력이 이것과 같으면 고쳤다가 되돌린 것이므로 Patch할 것이 없다.
+let rendered_test_area_html = '';
 let current_page_name = 'phase1';
 
 // Phase 2: 곡 모음 컴포넌트와 렌더링 기록. 기록은 화면 표시용이라 컴포넌트 State에 넣지 않는다.
@@ -90,6 +92,7 @@ function render_test_area(virtual_tree) {
   const serialized_html = serialize_to_html(virtual_tree);
   // 내용이 같으면 그대로 두어 커서 위치와 스크롤을 보존한다.
   if (test_area_element.value !== serialized_html) test_area_element.value = serialized_html;
+  rendered_test_area_html = serialized_html;
   is_test_area_dirty = false;
 }
 
@@ -440,7 +443,7 @@ function initialize() {
   update_controls();
 
   test_area_element.addEventListener('input', () => {
-    is_test_area_dirty = true;
+    is_test_area_dirty = test_area_element.value !== rendered_test_area_html;
     update_controls();
   });
   test_area_element.addEventListener('keydown', (keyboard_event) => {

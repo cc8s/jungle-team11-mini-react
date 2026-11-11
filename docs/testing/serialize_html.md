@@ -41,4 +41,4 @@
 | --- | --- | --- |
 | 직렬화 → 브라우저 파싱 왕복 결과가 원래 트리와 같은지 | Node에는 HTML 파서가 없음 | 2026-11-11 Chrome 156에서 `parse_html_to_virtual_tree(serialize_to_html(tree))`와 `tree`를 `is_same_tree`로 3번 연속 비교. 26가지 입력(페이지 기본 샘플, raw text 요소, `textarea`·`title` 엔티티, nbsp, attribute 엔티티, SVG `style`·`text`·`foreignObject`, MathML, table foster parenting, `template`, 주석, CRLF, `select`, 닫히지 않은 `p` 등) 중 수정 전 4가지가 달랐다. EC-009 ~ EC-011을 고친 뒤 남은 차이는 EC-012의 2가지뿐이고, 그것도 첫 왕복 뒤에는 바뀌지 않음 |
 | `<pre>`, `<textarea>` 첫 줄바꿈 | HTML 파서는 이 요소 바로 뒤의 첫 줄바꿈을 버림 | 해결함 (EC-009). 위 브라우저 왕복에서 `pre`·`textarea`·`listing`의 줄바꿈 두 개로 시작하는 내용, 줄바꿈만 있는 내용 모두 3번 왕복해도 같음 |
-| 실제 화면에서 뒤로가기 후 수정 없이 Patch | 왕복 결과가 화면 동작으로 이어지는지 | 2026-11-10 수동 확인: 기본 샘플은 "변경 사항이 없습니다". EC-012 입력은 첫 Patch에서 변경이 생길 수 있음 |
+| 실제 화면에서 뒤로가기 후 수정 없이 Patch | 왕복 결과가 화면 동작으로 이어지는지 | 화면에서는 이 상황이 생기지 않는다. 테스트 영역 내용이 마지막으로 그린 HTML과 같으면 Patch 버튼이 꺼지므로(`app.md` EC-001, 고쳤다가 되돌린 경우 포함) 수정 없는 Patch는 할 수 없다. 2026-11-11 앱 내장 브라우저에서 확인: v2에서 뒤로가기 후 스페이스를 쳤다 지우면 Patch는 꺼지고 앞으로가기는 켜진 채. 왕복 자체가 같은지는 위 행의 브라우저 비교로 확인함 |
